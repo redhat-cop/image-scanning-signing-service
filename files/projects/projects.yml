@@ -1,0 +1,6 @@
+kind: ProjectRequest
+apiVersion: v1
+metadata:
+  name: image-management
+displayName: Image Management
+description: Manages Images for the Platform

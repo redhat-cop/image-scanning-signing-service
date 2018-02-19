@@ -1,0 +1,51 @@
+#!/bin/bash
+
+set -e
+
+LOCAL_SOURCE_DIR=/tmp/src
+
+echo
+echo "==== Beginning Go S2I Build Process ===="
+echo
+
+pushd $LOCAL_SOURCE_DIR >/dev/null 2>&1
+
+pkgName="$(go list -e -f '{{.ImportComment}}' 2>/dev/null || true)"
+
+if [ -z "$pkgName" ];
+then
+  echo "Error: Must add canonical import path to root package"
+  exit 992
+fi
+
+popd >/dev/null 2>&1
+
+# Grab the last segment from the package name
+name=${pkgName##*/}
+
+# Construct Go package path
+pkgPath="$GOPATH/src/$pkgName"
+
+# Set-up src directory tree in GOPATH
+mkdir -p "$(dirname "$pkgPath")"
+
+mv $LOCAL_SOURCE_DIR $pkgPath
+
+cd $pkgPath
+
+echo
+echo "--> Beginning Go Project $pkgName =="
+echo
+
+# Build code
+go build -v -o main
+
+# Move built binary to gobin
+mv main $GOBIN
+
+# Remove source
+rm -rf $GOPATH/src/*
+
+echo
+echo "==== Completed S2I Build Process ===="
+echo

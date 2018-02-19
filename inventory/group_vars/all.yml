@@ -1,0 +1,45 @@
+---
+  openshift_cluster_content:
+    - object: crd
+      content:
+        - name: imagesigningrequest
+          file: "{{ inventory_dir }}/../examples/image-signing-request-crd.yml"
+    - object: projectrequest
+      content:
+        - name: image-management-project
+          file: "{{ inventory_dir }}/../files/projects/projects.yml"
+          file_action: create
+    - object: policy
+      content:
+        - name: image-sign-scan-base
+          namespace: "image-management"
+          template: "{{ inventory_dir }}/../files/policy/template.yml"
+          params: "{{ inventory_dir }}/../files/policy/params"
+        - name: privileged-scc
+          template: "{{ inventory_dir }}/../files/scc/template.yml"
+          params: "{{ inventory_dir }}/../files/scc/params"
+    - object: gpg
+      content:
+        - name: gpg
+          namespace: "image-management"
+          template: "{{ inventory_dir }}/../files/gpg/template.yml"
+          params: "{{ inventory_dir }}/../files/gpg/params"
+    - object: imagestreams
+      content:
+        - name: rhel
+          file: "{{ inventory_dir }}/../files/imagestreams/images.yml"
+          namespace: "image-management"
+    - object: builds
+      content:
+        - name: s2i-golang
+          namespace: "image-management"
+          template: "{{ inventory_dir }}/../files/builds/s2i-golang/template.yml"
+          params: "{{ inventory_dir }}/../files/builds/s2i-golang/params"
+        - name: image-sign-scan-base
+          namespace: "image-management"
+          template: "{{ inventory_dir }}/../files/builds/sign-image/template.yml"
+          params: "{{ inventory_dir }}/../files/builds/sign-image/params"
+        - name: image-scanning-signing-service
+          namespace: "image-management"
+          template: "{{ inventory_dir }}/../files/builds/image-scanning-signing-service/template.yml"
+          params: "{{ inventory_dir }}/../files/builds/image-scanning-signing-service/params"
