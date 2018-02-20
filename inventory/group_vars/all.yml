@@ -43,3 +43,9 @@
           namespace: "image-management"
           template: "{{ inventory_dir }}/../files/builds/image-scanning-signing-service/template.yml"
           params: "{{ inventory_dir }}/../files/builds/image-scanning-signing-service/params"
+    - object: deployments
+      content:
+        - name: image-scanning-signing-service
+          namespace: "image-management"
+          template: "{{ inventory_dir }}/../files/deployments/template.yml"
+          params: "{{ inventory_dir }}/../files/deployments/params"

@@ -1,0 +1,53 @@
+apiVersion: v1
+kind: Template
+metadata:
+  name: image-scanning-signing-service-build
+  annotations:
+    openshift.io/display-name: Image Scanning Signing Service
+    description: Template to create the Image Scanning Signing Service Application
+objects:
+- apiVersion: v1
+  kind: ImageStream
+  metadata:
+    name: ${NAME}
+- apiVersion: v1
+  kind: BuildConfig
+  metadata:
+    name: ${NAME}
+  spec:
+    output:
+      to:
+        kind: ImageStreamTag
+        name: ${NAME}:latest
+    source:
+      git:
+        ref: "${SOURCE_REPOSITORY_REF}"
+        uri: "${SOURCE_REPOSITORY_URL}"
+      type: Git
+    strategy:
+      sourceStrategy:
+        from:
+          kind: ImageStreamTag
+          name: ${FROM_IMAGE}
+      type: Source
+    triggers:
+    - type: ConfigChange
+    - imageChange: {}
+      type: ImageChange
+parameters:
+- name: NAME
+  displayName: Name
+  description: Name Applied to the Resulting ImageStream and BuildConfig
+  value: image-scanning-signing-service
+  required: true
+- description: Image stream tag for the image you'd like to use to build the application
+  name: FROM_IMAGE
+  required: true
+  value: s2i-golang:latest
+- description: Git branch/tag reference
+  name: SOURCE_REPOSITORY_REF
+  value: master
+- description: Git source URL for application
+  name: SOURCE_REPOSITORY_URL
+  required: true
+  value: https://github.com/redhat-cop/image-scanning-signing-service
