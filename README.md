@@ -53,28 +53,20 @@ Complete the following steps to deploy the Image Scanning and Signing Service.
 
 1. Clone this repository to your local machine and navigate into the repository
 
-   ```
-git clone https://github.com/redhat-cop/image-scanning-signing-service
-cd image-scanning-signing-service
-   ```
-
+		git clone https://github.com/redhat-cop/image-scanning-signing-service
+		cd image-scanning-signing-service
+ 
 2. Run Ansible Galaxy to pull in required Ansible dependencies
 
-   ```
-ansible-galaxy -r requirements.yml -p roles
-   ```
+		ansible-galaxy -r requirements.yml -p roles
 
 3. Login to OpenShift cluster as a user with `cluster-admin` rights
 
-   ```
-oc login -u <username> https://<openshift-server>
-   ```
+		oc login -u <username> https://<openshift-server>
 
 4. Execute provisioning
 
-   ```
-ansible-playbook -i inventory/ roles/casl-ansible/playbooks/openshift-cluster-seed.yml
-   ```
+		ansible-playbook -i inventory/ roles/casl-ansible/playbooks/openshift-cluster-seed.yml
 
 Confirm the ansible run was successful. A series of builds and deployments will occur within OpenShift. Provisioning will be successful when a pod starting with `image-scanning-signing-service` from the command `oc get pods -n image-management`
 
