@@ -49,6 +49,13 @@ The following prerequsites must be met in order to deploy the components through
 
 ### Deployment
 
+Currently, there are two types of deployments:
+
+* Core infrastructure
+* Continuous Integration/Continuous Delivery demonstration (in subsequent section)
+
+Depending on the type of deployment that you are targeting, _filter_tags_ as part of the _openshift-applier_ can be specified as described below.
+
 Complete the following steps to deploy the Image Scanning and Signing Service.
 
 1. Clone this repository to your local machine and navigate into the repository
@@ -66,17 +73,23 @@ Complete the following steps to deploy the Image Scanning and Signing Service.
 
 4. Execute provisioning
 
-		ansible-playbook -i inventory/ roles/casl-ansible/playbooks/openshift-cluster-seed.yml
+To deploy  the core infrastructure, specify the Ansible environment variable `-e filter_tags=core` as shown below
+
+		ansible-playbook -i inventory/ roles/casl-ansible/playbooks/openshift-cluster-seed.yml -e filter_tags=core
 
 Confirm the ansible run was successful. A series of builds and deployments will occur within OpenShift. Provisioning will be successful when a pod starting with `image-scanning-signing-service` from the command `oc get pods -n image-management`
 
-## Image Signing Demo
+## Demonstrations
+
+There are multiple ways to demonstrate image scanning and image signing inaction. 
+
+### Simple Workflow
 
 To facilitate Image Signing, the _image-scanning-signing-service_ makes use of a `ImageSigningRequest` Custom Resource Definition which allows users to declare their intent to have an image signed. This section will walk through the process of signing an image after a new image has been built.
 
 OpenShift provides a number of quickstart templates. One of these templates contains a simple .NET Core web application application. This is an ideal use case to showcase image signing in action.
 
-### Build an Application
+#### Build an Application
 
 First, create a new project called _dotnet-example_
 
@@ -100,7 +113,7 @@ When the build completes, the image has been pushed to the OpenShift internal re
 
 ### Declare an Intent to Sign the Image  
 
-To delare your intent to sign the previously built image, a new `ImageSigningRequest` can be created within the project. A typical request is shown below
+To declare your intent to sign the previously built image, a new `ImageSigningRequest` can be created within the project. A typical request is shown below
 
 ```
 apiVersion: cop.redhat.com/v1alpha1
@@ -147,3 +160,40 @@ signatures:
     uid: a08ed947-15da-11e8-ae24-fa163e6706b0
   type: atomic
 ``` 
+
+### Continuous Integration and Continuous Delivery
+
+This example demonstrates how to leverage image scanning and signing as part of a Continuous Integration and Continuous Delivery pipeline. 
+
+#### Provisioning
+
+Similar to the deployment of the core infrastructure, this demonstration can be provisioned using the OpenShift applier by specifying the `-e filter_tags=pipeline` Ansible environment variable.
+
+Execute the following command to provision the components:
+
+		ansible-playbook -i inventory/ roles/casl-ansible/playbooks/openshift-cluster-seed.yml -e filter_tags=pipeline
+
+Once complete, a new project called `image-scanning-signing-pipeline` which will contain a Jenkins server along with application build (_JenkinsPipeline_ and _Binary S2I_) along with deployment objects.
+
+Triggers have been enabled on the Jenkins pipeline so a build will be triggered automatically. 
+
+Login to the OpenShift web console and select the _Image Scanning and Signing Pipeline_ project. View running pipelines by hovering over _Builds_ on the lefthand navigation bar and select **Pipelines**. 
+
+Under _Build #1_, select **View Log** which will redirect to the Jenkins instance which was deployed. 
+
+You can view the progress of the build log. Otherwise, select **Back to Project** on the lefthand navigation links to view the overall state of the builds. 
+
+As it progresses through the pipeline, the following actions will occur:
+
+* Code build
+* Image build
+* Image scanning and signing actions
+* Application deployments
+
+Once successful, the stage view will appear similar to the following:
+
+![CICD  PIpeline](docs/images/ci-pipeline.png)
+
+Back within the OpenShift web console, locate the address of the exposed _Route_ to access the application by hovering over _Applications_  on the lefthand navigation bar and selecting **Routes**. Click on the URL provided underneath _Hostname_.
+
+To learn more about the underlying steps that are executed within the pipeline, browse through the included [Jenkinsfile](ci/Jenkinsfile).

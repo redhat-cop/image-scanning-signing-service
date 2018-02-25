@@ -1,0 +1,114 @@
+apiVersion: v1
+kind: Template
+metadata:
+  name: image-scanning-signing-application
+  annotations:
+    openshift.io/display-name: Example Application
+    description: Template to create the Example Application
+objects:
+- apiVersion: v1
+  kind: DeploymentConfig
+  metadata:
+    labels:
+      app: ${APPLICATION_NAME}
+    name: ${APPLICATION_NAME}
+  spec:
+    replicas: 1
+    selector:
+      app: ${APPLICATION_NAME}
+      deploymentConfig: ${APPLICATION_NAME}
+    strategy:
+      activeDeadlineSeconds: 21600
+      rollingParams:
+        intervalSeconds: 1
+        maxSurge: 25%
+        maxUnavailable: 25%
+        timeoutSeconds: 600
+        updatePeriodSeconds: 1
+      type: Rolling
+    template:
+      metadata:
+        labels:
+          app: ${APPLICATION_NAME}
+          deploymentConfig: ${APPLICATION_NAME}
+      spec:
+        containers:
+        - image: ${APPLICATION_NAME}
+          ports:
+          - containerPort: 8778
+            name: jolokia
+            protocol: TCP
+          - containerPort: 8080
+            name: http
+            protocol: TCP
+          readinessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /${READINESS_PATH}
+              port: 8080
+              scheme: HTTP
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 1
+          imagePullPolicy: Always
+          name: ${APPLICATION_NAME}
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+        restartPolicy: Always
+        terminationGracePeriodSeconds: 30
+    test: false
+    triggers:
+    - imageChangeParams:
+        automatic: false
+        containerNames:
+        - ${APPLICATION_NAME}
+        from:
+          kind: ImageStreamTag
+          name: ${APPLICATION_NAME}:${APPLICATION_TAG}
+      type: ImageChange
+- apiVersion: v1
+  kind: Service
+  metadata:
+    annotations:
+      description: The web server's http port.
+    labels:
+      application: ${APPLICATION_NAME}
+    name: ${APPLICATION_NAME}
+  spec:
+    ports:
+    - port: 8080
+      targetPort: 8080
+    selector:
+      deploymentConfig: ${APPLICATION_NAME}
+- apiVersion: v1
+  id: ${APPLICATION_NAME}-http
+  kind: Route
+  metadata:
+    annotations:
+      description: Route for application's http service.
+    labels:
+      application: ${APPLICATION_NAME}
+    name: ${APPLICATION_NAME}
+  spec:
+    host: ${HOSTNAME_HTTP}
+    to:
+      name: ${APPLICATION_NAME}
+parameters:
+- name: APPLICATION_NAME
+  displayName: Application Name
+  description: Name Applied to the Resulting ImageStream and BuildConfig
+  value: example-application
+  required: true
+- name: APPLICATION_TAG
+  displayName: Application Tag
+  description: Name Applied to the Resulting ImageStream and BuildConfig
+  value: deploy
+  required: true
+- description: 'Custom hostname for http service route.  Leave blank for default hostname,
+    e.g.: <application-name>-<project>.<default-domain-suffix>'
+  name: HOSTNAME_HTTP
+- description: 'URI to check for app health'
+  name: READINESS_PATH
+  required: true
+  value: '/health'

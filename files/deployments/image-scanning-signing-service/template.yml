@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Template
 metadata:
-  name: image-scanning-signing-service-
+  name: image-scanning-signing-service
   annotations:
     openshift.io/display-name: Image Scanning Signing Service
     description: Template to create the Image Scanning Signing Service Application

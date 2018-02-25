@@ -1,0 +1,6 @@
+kind: ProjectRequest
+apiVersion: v1
+metadata:
+  name: image-scanning-signing-pipeline
+displayName: Image Scanning and Signing Pipeline
+description: Demonstrates a Image Scanning and Signing Pipeline

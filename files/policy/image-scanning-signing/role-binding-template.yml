@@ -1,0 +1,32 @@
+apiVersion: v1
+kind: Template
+metadata:
+  name: image-signing-scanning-rolebinding-template
+  annotations:
+    openshift.io/display-name: Image Signing Scanning RoleBinding
+    description: Template to create a RoleBinding for Image Signing and Scanning resources
+objects:
+- apiVersion: v1
+  kind: RoleBinding
+  metadata:
+    name: ${SERVICE_ACCOUNT_NAME}_${ROLE_NAME}
+    namespace: ${NAMESPACE}
+  roleRef:
+    name: ${ROLE_NAME}
+  subjects:
+  - kind: ServiceAccount
+    name: "${SERVICE_ACCOUNT_NAME}"
+parameters:
+- name: SERVICE_ACCOUNT_NAME
+  displayName: Service Account Name
+  description: Name of the service account to Create
+  required: true
+- name: ROLE_NAME
+  displayName: Role Name
+  description: Name of the role resources
+  value: image-scanning-signing-resources
+  required: true
+- name: NAMESPACE
+  displayName: Namespace
+  description: Namespace Containing Resources
+  required: true

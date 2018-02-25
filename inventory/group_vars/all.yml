@@ -4,48 +4,96 @@
       content:
         - name: imagesigningrequest
           file: "{{ inventory_dir }}/../examples/image-signing-request-crd.yml"
+          tags:
+            - core
     - object: projectrequest
       content:
         - name: image-management-project
-          file: "{{ inventory_dir }}/../files/projects/projects.yml"
+          file: "{{ inventory_dir }}/../files/projects/projects-image-management.yml"
           file_action: create
+          tags:
+            - core
+        - name: image-scanning-signing-project
+          file: "{{ inventory_dir }}/../files/projects/projects-image-scanning-signing-pipeline.yml"
+          file_action: create
+          tags:
+            - pipeline
     - object: policy
       content:
-        - name: image-sign-scan-base
-          namespace: "image-management"
-          template: "{{ inventory_dir }}/../files/policy/template.yml"
-          params: "{{ inventory_dir }}/../files/policy/params"
+        - name: core-policy
+          template: "{{ inventory_dir }}/../files/policy/core/template.yml"
+          params: "{{ inventory_dir }}/../files/policy/core/params"
+          tags:
+            - core
+        - name: image-scanning-signing-application-policy
+          template: "{{ inventory_dir }}/../files/policy/image-scanning-signing/role-binding-template.yml"
+          params: "{{ inventory_dir }}/../files/policy/image-scanning-signing/params-scanning-signing-pipeline"
+          namespace: image-scanning-signing-pipeline
+          tags:
+            - pipeline
         - name: privileged-scc
           template: "{{ inventory_dir }}/../files/scc/template.yml"
           params: "{{ inventory_dir }}/../files/scc/params"
+          tags:
+            - core
     - object: gpg
       content:
         - name: gpg
           namespace: "image-management"
           template: "{{ inventory_dir }}/../files/gpg/template.yml"
           params: "{{ inventory_dir }}/../files/gpg/params"
+          tags:
+            - core
     - object: imagestreams
       content:
         - name: rhel
           file: "{{ inventory_dir }}/../files/imagestreams/images.yml"
           namespace: "image-management"
+          tags:
+            - core
     - object: builds
       content:
+        - name: "image-scanning-signing-application"
+          template: "{{ inventory_dir }}/../files/builds/image-scanning-signing-pipeline/template.yml"
+          params: "{{ inventory_dir }}/../files/builds/image-scanning-signing-pipeline/params"
+          namespace: image-scanning-signing-pipeline
+          tags:
+            - pipeline
         - name: s2i-golang
           namespace: "image-management"
           template: "{{ inventory_dir }}/../files/builds/s2i-golang/template.yml"
           params: "{{ inventory_dir }}/../files/builds/s2i-golang/params"
+          tags:
+            - core
         - name: image-sign-scan-base
           namespace: "image-management"
           template: "{{ inventory_dir }}/../files/builds/sign-image/template.yml"
           params: "{{ inventory_dir }}/../files/builds/sign-image/params"
+          tags:
+            - core
         - name: image-scanning-signing-service
           namespace: "image-management"
           template: "{{ inventory_dir }}/../files/builds/image-scanning-signing-service/template.yml"
           params: "{{ inventory_dir }}/../files/builds/image-scanning-signing-service/params"
+          tags:
+            - core
     - object: deployments
       content:
+        - name: "deploy jenkins"
+          template: "openshift//jenkins-ephemeral"
+          params: "{{ inventory_dir }}/../files/deployments/image-scanning-signing-pipeline/params-jenkins"
+          namespace: image-scanning-signing-pipeline
+          tags:
+            - pipeline
         - name: image-scanning-signing-service
           namespace: "image-management"
-          template: "{{ inventory_dir }}/../files/deployments/template.yml"
-          params: "{{ inventory_dir }}/../files/deployments/params"
+          template: "{{ inventory_dir }}/../files/deployments/image-scanning-signing-service/template.yml"
+          params: "{{ inventory_dir }}/../files/deployments/image-scanning-signing-service/params"
+          tags:
+            - core
+        - name: image-scanning-signing-application
+          namespace: "image-scanning-signing-pipeline"
+          template: "{{ inventory_dir }}/../files/deployments/image-scanning-signing-pipeline/template.yml"
+          params: "{{ inventory_dir }}/../files/deployments/image-scanning-signing-pipeline/params"
+          tags:
+            - pipeline
