@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -19,7 +20,7 @@ import (
 	"github.com/redhat-cop/image-scanning-signing-service/pkg/config"
 	"github.com/redhat-cop/image-scanning-signing-service/pkg/util"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -215,7 +216,7 @@ func (c *Controller) processNextImageSigningRequestWorkItem() bool {
 		// Run the syncHandlerImageSigningRequests, passing it the namespace/name string of the
 		// Foo resource to be synced.
 		if err := c.syncHandlerImageSigningRequests(key); err != nil {
-			return fmt.Errorf("error syncing ImageSigningRequest '%s': %s", key, err.Error())
+			return fmt.Errorf("Error syncing ImageSigningRequest '%s': %s", key, err.Error())
 		}
 
 		c.workqueueImageSigningRequests.Forget(obj)
@@ -250,12 +251,12 @@ func (c *Controller) processNextPodsWorkItem() bool {
 		if key, ok = obj.(string); !ok {
 
 			c.workqueuePods.Forget(obj)
-			runtime.HandleError(fmt.Errorf("expected string in Pods workqueue but got %#v", obj))
+			runtime.HandleError(fmt.Errorf("Expected string in Pods workqueue but got %#v", obj))
 			return nil
 		}
 
 		if err := c.syncHandlerPods(key); err != nil {
-			return fmt.Errorf("error syncing Pods '%s': %s", key, err.Error())
+			return fmt.Errorf("Error syncing Pods '%s': %s", key, err.Error())
 		}
 
 		c.workqueuePods.Forget(obj)
@@ -280,12 +281,12 @@ func (c *Controller) syncHandlerImageSigningRequests(key string) error {
 	}
 
 	// Get the Foo resource with this namespace/name
-	imagesigningrequest, err := c.imagesigningrequestLister.ImageSigningRequests(namespace).Get(name)
+	imageSigningRequest, err := c.imagesigningrequestLister.ImageSigningRequests(namespace).Get(name)
 	if err != nil {
 		// The Foo resource may no longer exist, in which case we stop
 		// processing.
-		if errors.IsNotFound(err) {
-			runtime.HandleError(fmt.Errorf("imagesigningrequest '%s' in work queue no longer exists", key))
+		if k8serrors.IsNotFound(err) {
+			runtime.HandleError(fmt.Errorf("ImageSigningRequest '%s' in work queue no longer exists", key))
 			return nil
 		}
 
@@ -295,17 +296,16 @@ func (c *Controller) syncHandlerImageSigningRequests(key string) error {
 	// Trigger new Signing Template action if no status found
 	emptyStatus := copv1.ImageSigningRequestStatus{}
 	emptyPhase := copv1.ImageSigningRequestStatus{}.Phase
-	if imagesigningrequest.Status == emptyStatus && imagesigningrequest.Status.Phase == emptyPhase {
+	if imageSigningRequest.Status == emptyStatus && imageSigningRequest.Status.Phase == emptyPhase {
 
-		// TODO: Consolidate this logic with similar logic during confirmation phase
-		requestIsName, requestIsTag := parseImageStreamTag(imagesigningrequest.Spec.ImageStreamTag)
+		_, requestIsTag := parseImageStreamTag(imageSigningRequest.Spec.ImageStreamTag)
 
-		requestImageStream, err := c.imageclientset.ImageV1().ImageStreams(imagesigningrequest.Namespace).Get(requestIsName, metav1.GetOptions{})
+		requestImageStreamTag, err := c.imageclientset.ImageV1().ImageStreamTags(imageSigningRequest.Namespace).Get(imageSigningRequest.Spec.ImageStreamTag, metav1.GetOptions{})
 
-		if errors.IsNotFound(err) {
-			glog.Warningf("Cannot Find ImageStream %s in Namespace %s", requestIsName, imagesigningrequest.Namespace)
+		if k8serrors.IsNotFound(err) {
+			glog.Warningf("Cannot Find ImageStreamTag %s in Namespace %s", imageSigningRequest.Spec.ImageStreamTag, imageSigningRequest.Namespace)
 
-			err = c.updateImageSigningRequest(fmt.Sprintf("ImageStream %s Not Found in Namespace %s", requestIsName, imagesigningrequest.Namespace), "", "", *imagesigningrequest, copv1.PhaseFailed)
+			err = c.updateImageSigningRequest(fmt.Sprintf("ImageStreamTag %s Not Found in Namespace %s", imageSigningRequest.Spec.ImageStreamTag, imageSigningRequest.Namespace), "", "", *imageSigningRequest, copv1.PhaseFailed)
 
 			if err != nil {
 				return err
@@ -315,38 +315,16 @@ func (c *Controller) syncHandlerImageSigningRequests(key string) error {
 
 		}
 
-		requestImageStreamTagEvent := latestTaggedImage(requestImageStream, requestIsTag)
-
-		if requestImageStreamTagEvent == nil {
-			glog.Errorf("Unable to locate tag '%s' on ImageStream '%s'", requestIsTag, requestIsName)
-
-			err = c.updateImageSigningRequest(fmt.Sprintf("Unable to locate tag '%s' on ImageStream '%s'", requestIsTag, requestIsName), "", "", *imagesigningrequest, copv1.PhaseFailed)
-
-			if err != nil {
-				return err
-			}
-
-			return nil
-		}
-
-		image, err := c.imageclientset.ImageV1().Images().Get(requestImageStreamTagEvent.Image, metav1.GetOptions{})
+		dockerImageRegistry, dockerImageId, err := extractImageIdFromImageReference(requestImageStreamTag.Image.DockerImageReference)
 
 		if err != nil {
-			runtime.HandleError(fmt.Errorf("Invalid image: %s", requestImageStreamTagEvent.Image))
-
-			err = c.updateImageSigningRequest(fmt.Sprintf("Invalid image '%s'", requestImageStreamTagEvent.Image), "", "", *imagesigningrequest, copv1.PhaseFailed)
-
-			if err != nil {
-				return err
-			}
-
-			return nil
+			return err
 		}
 
-		if image.Signatures != nil {
-			glog.Warningf("Signatures Exist on Image '%s'", requestImageStreamTagEvent.Image)
+		if requestImageStreamTag.Image.Signatures != nil {
+			glog.Warningf("Signatures Exist on Image '%s'", dockerImageId)
 
-			err = c.updateImageSigningRequest(fmt.Sprintf("Signatures Exist on Image '%s'", requestImageStreamTagEvent.Image), "", requestImageStreamTagEvent.Image, *imagesigningrequest, copv1.PhaseFailed)
+			err = c.updateImageSigningRequest(fmt.Sprintf("Signatures Exist on Image '%s'", dockerImageId), "", dockerImageId, *imageSigningRequest, copv1.PhaseFailed)
 
 			if err != nil {
 				return err
@@ -355,16 +333,14 @@ func (c *Controller) syncHandlerImageSigningRequests(key string) error {
 			return nil
 
 		} else {
-			glog.Infof("No Signatures Exist on Image '%s'", requestImageStreamTagEvent.Image)
+			glog.Infof("No Signatures Exist on Image '%s'", dockerImageId)
 
-			dockerImageReferenceContent := strings.Split(requestImageStreamTagEvent.DockerImageReference, "@")
-
-			signingPodName, err := c.launchPod(fmt.Sprintf("%s:%s", dockerImageReferenceContent[0], requestIsTag), dockerImageReferenceContent[1], string(imagesigningrequest.ObjectMeta.UID), key)
+			signingPodName, err := c.launchPod(fmt.Sprintf("%s:%s", dockerImageRegistry, requestIsTag), dockerImageId, string(imageSigningRequest.ObjectMeta.UID), key)
 
 			if err != nil {
 				glog.Errorf("Error Occurred Creating Signing Pod '%v'", err)
 
-				err = c.updateImageSigningRequest(fmt.Sprintf("Error Occurred Creating Signing Pod '%v'", err), requestImageStreamTagEvent.Image, "", *imagesigningrequest, copv1.PhaseFailed)
+				err = c.updateImageSigningRequest(fmt.Sprintf("Error Occurred Creating Signing Pod '%v'", err), dockerImageId, "", *imageSigningRequest, copv1.PhaseFailed)
 
 				if err != nil {
 					return err
@@ -375,7 +351,7 @@ func (c *Controller) syncHandlerImageSigningRequests(key string) error {
 
 			glog.Infof("Signing Pod Launched '%s'", signingPodName)
 
-			err = c.updateImageSigningRequest(fmt.Sprintf("Signing Pod Launched '%s'", signingPodName), requestImageStreamTagEvent.Image, "", *imagesigningrequest, copv1.PhaseRunning)
+			err = c.updateImageSigningRequest(fmt.Sprintf("Signing Pod Launched '%s'", signingPodName), dockerImageId, "", *imageSigningRequest, copv1.PhaseRunning)
 
 			if err != nil {
 				return err
@@ -403,7 +379,7 @@ func (c *Controller) syncHandlerPods(key string) error {
 	pod, err := c.kubeclientset.CoreV1().Pods(namespace).Get(name, metav1.GetOptions{})
 
 	if err != nil {
-		if errors.IsNotFound(err) {
+		if k8serrors.IsNotFound(err) {
 			runtime.HandleError(fmt.Errorf("pod '%s' in work queue no longer exists", key))
 			return nil
 		}
@@ -418,7 +394,7 @@ func (c *Controller) syncHandlerPods(key string) error {
 	imageSigningRequest, err := c.imagesigningrequestLister.ImageSigningRequests(isrNamespace).Get(isrName)
 
 	if err != nil {
-		glog.Warningf("could not find imagesigningrequest '%s' from pod '%s'", podOwnerAnnotation, key)
+		glog.Warningf("Could not find ImageSigningRequest '%s' from pod '%s'", podOwnerAnnotation, key)
 		return err
 	}
 
@@ -442,17 +418,12 @@ func (c *Controller) syncHandlerPods(key string) error {
 
 	} else if pod.Status.Phase == corev1.PodSucceeded {
 
-		// TODO: Need to check if latestimage has a signature
+		requestImageStreamTag, err := c.imageclientset.ImageV1().ImageStreamTags(imageSigningRequest.Namespace).Get(imageSigningRequest.Spec.ImageStreamTag, metav1.GetOptions{})
 
-		// TODO: Consolidate this logic with similar logic during confirmation phase
-		requestIsName, requestIsTag := parseImageStreamTag(imageSigningRequest.Spec.ImageStreamTag)
+		if k8serrors.IsNotFound(err) {
+			glog.Warningf("Cannot Find ImageStreamTag %s in Namespace %s", imageSigningRequest.Spec.ImageStreamTag, imageSigningRequest.Namespace)
 
-		requestImageStream, err := c.imageclientset.ImageV1().ImageStreams(imageSigningRequest.Namespace).Get(requestIsName, metav1.GetOptions{})
-
-		if errors.IsNotFound(err) {
-			glog.Warningf("Cannot Find ImageStream %s in Namespace %s", requestIsName, imageSigningRequest.Namespace)
-
-			err = c.updateImageSigningRequest(fmt.Sprintf("ImageStream %s Not Found in Namespace %s", requestIsName, imageSigningRequest.Namespace), "", "", *imageSigningRequest, copv1.PhaseFailed)
+			err = c.updateImageSigningRequest(fmt.Sprintf("ImageStream %s Not Found in Namespace %s", imageSigningRequest.Spec.ImageStreamTag, imageSigningRequest.Namespace), "", "", *imageSigningRequest, copv1.PhaseFailed)
 
 			if err != nil {
 				return err
@@ -462,45 +433,23 @@ func (c *Controller) syncHandlerPods(key string) error {
 
 		}
 
-		requestImageStreamTagEvent := latestTaggedImage(requestImageStream, requestIsTag)
-
-		if requestImageStreamTagEvent == nil {
-			glog.Errorf("Unable to locate tag '%s' on ImageStream '%s'", requestIsTag, requestIsName)
-
-			err = c.updateImageSigningRequest(fmt.Sprintf("Unable to locate tag '%s' on ImageStream '%s'", requestIsTag, requestIsName), "", "", *imageSigningRequest, copv1.PhaseFailed)
-
-			if err != nil {
-				return err
-			}
-
-			return nil
-		}
-
-		image, err := c.imageclientset.ImageV1().Images().Get(requestImageStreamTagEvent.Image, metav1.GetOptions{})
+		_, dockerImageId, err := extractImageIdFromImageReference(requestImageStreamTag.Image.DockerImageReference)
 
 		if err != nil {
-			runtime.HandleError(fmt.Errorf("invalid image: %s", requestImageStreamTagEvent.Image))
-
-			err = c.updateImageSigningRequest(fmt.Sprintf("invalid image '%s'", requestImageStreamTagEvent.Image), "", "", *imageSigningRequest, copv1.PhaseFailed)
-
-			if err != nil {
-				return err
-			}
-
-			return nil
+			return err
 		}
 
-		if image.Signatures != nil {
+		if requestImageStreamTag.Image.Signatures != nil {
 			glog.Infof("Signing Pod Succeeded. Updating ImageSiginingRequest %s", pod.Annotations[ownerAnnotation])
 
-			err = c.updateImageSigningRequest("Image Signed", "", requestImageStreamTagEvent.Image, *imageSigningRequest, copv1.PhaseCompleted)
+			err = c.updateImageSigningRequest("Image Signed", "", dockerImageId, *imageSigningRequest, copv1.PhaseCompleted)
 
 			if err != nil {
 				return err
 			}
 
 		} else {
-			err = c.updateImageSigningRequest(fmt.Sprintf("No Signature Exists on Image '%s' After Signing Completed", requestImageStreamTagEvent.Image), "", "", *imageSigningRequest, copv1.PhaseFailed)
+			err = c.updateImageSigningRequest(fmt.Sprintf("No Signature Exists on Image '%s' After Signing Completed", dockerImageId), "", "", *imageSigningRequest, copv1.PhaseFailed)
 
 			if err != nil {
 				return err
@@ -583,90 +532,6 @@ func (c *Controller) launchPod(image string, imageDigest string, ownerID string,
 	return key, nil
 }
 
-/*
-func (c *Controller) launchTemplate(image string, imageDigest string, ownerID string, ownerReference string) (string, error) {
-
-	templateNamespace, templateName, err := cache.SplitMetaNamespaceKey(c.configuration.SigningTemplate)
-
-	// Check that Template Exists
-	template, err := c.templateclientset.TemplateV1().Templates(templateNamespace).Get(templateName, metav1.GetOptions{})
-
-	if err != nil {
-		glog.Errorf("Failed to Get Template: %v", err)
-		return "", err
-	}
-
-	glog.Infof("Template Information: %v", template)
-
-	// TODO: Add some logic to do parameter checking
-
-	secret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: ownerID,
-		},
-		Data: map[string][]byte{
-			"OWNER_REFERENCE": []byte(ownerReference),
-			"IMAGE_TO_SIGN":   []byte(image),
-			"IMAGE_DIGEST":    []byte(imageDigest),
-			"NAMESPACE":       []byte(c.configuration.TargetProject),
-			"SIGN_BY":         []byte(c.configuration.GpgSignBy),
-		},
-	}
-
-	_, err = c.kubeclientset.CoreV1().Secrets(c.configuration.TargetProject).Create(secret)
-
-	if err != nil {
-		glog.Errorf("Failed to Create Secret: %v", err)
-		return "", err
-	}
-
-	templateinstance := &templateapi.TemplateInstance{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: ownerID,
-		},
-		Spec: templateapi.TemplateInstanceSpec{
-			Template: *template,
-			Secret: &corev1.LocalObjectReference{
-				Name: ownerID,
-			},
-		},
-	}
-
-	_, err = c.templateclientset.Template().TemplateInstances(c.configuration.TargetProject).Create(templateinstance)
-
-	if err != nil {
-		glog.Errorf("Failed to create template instance: %v", err)
-		return "", err
-	}
-
-	// wait for templateinstance controller to do its thing
-	err = wait.Poll(time.Second, time.Minute, func() (bool, error) {
-		templateinstance, err = c.templateclientset.TemplateV1().TemplateInstances(c.configuration.TargetProject).Get(ownerID, metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-
-		for _, c := range templateinstance.Status.Conditions {
-			if c.Reason == "Failed" && c.Status == corev1.ConditionTrue {
-				return false, fmt.Errorf("failed condition: %s", c.Message)
-			}
-			if c.Reason == "Created" && c.Status == corev1.ConditionTrue {
-				return true, nil
-			}
-		}
-
-		return false, nil
-	})
-
-	if err != nil {
-		glog.Errorf("There was an error instantiating the template: %v", err)
-		return "", err
-	}
-
-	return "", nil
-}
-*/
-
 func parseImageStreamTag(imageStreamTag string) (string, string) {
 	requestIsNameTag := strings.Split(imageStreamTag, ":")
 
@@ -719,4 +584,18 @@ func (c *Controller) updateImageSigningRequest(message string, unsignedImage str
 	_, err := c.copclientset.CopV1alpha1().ImageSigningRequests(imageSigningRequest.Namespace).Update(imagesigningrequestCopy)
 
 	return err
+}
+
+func extractImageIdFromImageReference(dockerImageReference string) (string, string, error) {
+
+	dockerImageComponents := strings.Split(dockerImageReference, "@")
+
+	if len(dockerImageComponents) != 2 {
+		return "", "", errors.New("Unexpected Docker Image Reference")
+	}
+
+	dockerImageRegistry := dockerImageComponents[0]
+	dockerImageId := dockerImageComponents[1]
+
+	return dockerImageRegistry, dockerImageId, nil
 }
