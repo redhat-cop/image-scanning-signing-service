@@ -294,9 +294,8 @@ func (c *Controller) syncHandlerImageSigningRequests(key string) error {
 	}
 
 	// Trigger new Signing Template action if no status found
-	emptyStatus := copv1.ImageSigningRequestStatus{}
 	emptyPhase := copv1.ImageSigningRequestStatus{}.Phase
-	if imageSigningRequest.Status == emptyStatus && imageSigningRequest.Status.Phase == emptyPhase {
+	if imageSigningRequest.Status.Phase == emptyPhase {
 
 		_, requestIsTag := parseImageStreamTag(imageSigningRequest.Spec.ImageStreamTag)
 
@@ -305,7 +304,7 @@ func (c *Controller) syncHandlerImageSigningRequests(key string) error {
 		if k8serrors.IsNotFound(err) {
 			glog.Warningf("Cannot Find ImageStreamTag %s in Namespace %s", imageSigningRequest.Spec.ImageStreamTag, imageSigningRequest.Namespace)
 
-			err = c.updateImageSigningRequest(fmt.Sprintf("ImageStreamTag %s Not Found in Namespace %s", imageSigningRequest.Spec.ImageStreamTag, imageSigningRequest.Namespace), "", "", *imageSigningRequest, copv1.PhaseFailed)
+			err = c.updateOnInitializationFailure(fmt.Sprintf("ImageStreamTag %s Not Found in Namespace %s", imageSigningRequest.Spec.ImageStreamTag, imageSigningRequest.Namespace), *imageSigningRequest)
 
 			if err != nil {
 				return err
@@ -315,16 +314,16 @@ func (c *Controller) syncHandlerImageSigningRequests(key string) error {
 
 		}
 
-		dockerImageRegistry, dockerImageId, err := extractImageIdFromImageReference(requestImageStreamTag.Image.DockerImageReference)
+		dockerImageRegistry, dockerImageID, err := extractImageIDFromImageReference(requestImageStreamTag.Image.DockerImageReference)
 
 		if err != nil {
 			return err
 		}
 
 		if requestImageStreamTag.Image.Signatures != nil {
-			glog.Warningf("Signatures Exist on Image '%s'", dockerImageId)
+			glog.Warningf("Signatures Exist on Image '%s'", dockerImageID)
 
-			err = c.updateImageSigningRequest(fmt.Sprintf("Signatures Exist on Image '%s'", dockerImageId), "", dockerImageId, *imageSigningRequest, copv1.PhaseFailed)
+			err = c.updateOnInitializationFailure(fmt.Sprintf("Signatures Exist on Image '%s'", dockerImageID), *imageSigningRequest)
 
 			if err != nil {
 				return err
@@ -333,14 +332,14 @@ func (c *Controller) syncHandlerImageSigningRequests(key string) error {
 			return nil
 
 		} else {
-			glog.Infof("No Signatures Exist on Image '%s'", dockerImageId)
+			glog.Infof("No Signatures Exist on Image '%s'", dockerImageID)
 
-			signingPodName, err := c.launchPod(fmt.Sprintf("%s:%s", dockerImageRegistry, requestIsTag), dockerImageId, string(imageSigningRequest.ObjectMeta.UID), key)
+			signingPodName, err := c.launchPod(fmt.Sprintf("%s:%s", dockerImageRegistry, requestIsTag), dockerImageID, string(imageSigningRequest.ObjectMeta.UID), key)
 
 			if err != nil {
 				glog.Errorf("Error Occurred Creating Signing Pod '%v'", err)
 
-				err = c.updateImageSigningRequest(fmt.Sprintf("Error Occurred Creating Signing Pod '%v'", err), dockerImageId, "", *imageSigningRequest, copv1.PhaseFailed)
+				err = c.updateOnInitializationFailure(fmt.Sprintf("Error Occurred Creating Signing Pod '%v'", err), *imageSigningRequest)
 
 				if err != nil {
 					return err
@@ -351,7 +350,7 @@ func (c *Controller) syncHandlerImageSigningRequests(key string) error {
 
 			glog.Infof("Signing Pod Launched '%s'", signingPodName)
 
-			err = c.updateImageSigningRequest(fmt.Sprintf("Signing Pod Launched '%s'", signingPodName), dockerImageId, "", *imageSigningRequest, copv1.PhaseRunning)
+			err = c.updateOnSigningPodLaunch(fmt.Sprintf("Signing Pod Launched '%s'", signingPodName), dockerImageID, *imageSigningRequest)
 
 			if err != nil {
 				return err
@@ -408,7 +407,7 @@ func (c *Controller) syncHandlerPods(key string) error {
 	if pod.Status.Phase == corev1.PodFailed {
 		glog.Infof("Signing Pod Failed. Updating ImageSiginingRequest %s", podOwnerAnnotation)
 
-		err = c.updateImageSigningRequest(fmt.Sprintf("Signing Pod Failed '%v'", err), "", "", *imageSigningRequest, copv1.PhaseFailed)
+		err = c.updateOnCompletionError(fmt.Sprintf("Signing Pod Failed '%v'", err), *imageSigningRequest)
 
 		if err != nil {
 			return err
@@ -423,7 +422,7 @@ func (c *Controller) syncHandlerPods(key string) error {
 		if k8serrors.IsNotFound(err) {
 			glog.Warningf("Cannot Find ImageStreamTag %s in Namespace %s", imageSigningRequest.Spec.ImageStreamTag, imageSigningRequest.Namespace)
 
-			err = c.updateImageSigningRequest(fmt.Sprintf("ImageStream %s Not Found in Namespace %s", imageSigningRequest.Spec.ImageStreamTag, imageSigningRequest.Namespace), "", "", *imageSigningRequest, copv1.PhaseFailed)
+			err = c.updateOnCompletionError(fmt.Sprintf("ImageStream %s Not Found in Namespace %s", imageSigningRequest.Spec.ImageStreamTag, imageSigningRequest.Namespace), *imageSigningRequest)
 
 			if err != nil {
 				return err
@@ -433,7 +432,7 @@ func (c *Controller) syncHandlerPods(key string) error {
 
 		}
 
-		_, dockerImageId, err := extractImageIdFromImageReference(requestImageStreamTag.Image.DockerImageReference)
+		_, dockerImageID, err := extractImageIDFromImageReference(requestImageStreamTag.Image.DockerImageReference)
 
 		if err != nil {
 			return err
@@ -442,14 +441,14 @@ func (c *Controller) syncHandlerPods(key string) error {
 		if requestImageStreamTag.Image.Signatures != nil {
 			glog.Infof("Signing Pod Succeeded. Updating ImageSiginingRequest %s", pod.Annotations[ownerAnnotation])
 
-			err = c.updateImageSigningRequest("Image Signed", "", dockerImageId, *imageSigningRequest, copv1.PhaseCompleted)
+			err = c.updateOnCompletionSuccess("Image Signed", dockerImageID, *imageSigningRequest)
 
 			if err != nil {
 				return err
 			}
 
 		} else {
-			err = c.updateImageSigningRequest(fmt.Sprintf("No Signature Exists on Image '%s' After Signing Completed", dockerImageId), "", "", *imageSigningRequest, copv1.PhaseFailed)
+			err = c.updateOnCompletionError(fmt.Sprintf("No Signature Exists on Image '%s' After Signing Completed", dockerImageID), *imageSigningRequest)
 
 			if err != nil {
 				return err
@@ -567,26 +566,28 @@ func latestTaggedImage(stream *imagev1.ImageStream, tag string) *imagev1.TagEven
 
 }
 
-func (c *Controller) updateImageSigningRequest(message string, unsignedImage string, signedImage string, imageSigningRequest copv1.ImageSigningRequest, phase copv1.Phase) error {
+func (c *Controller) updateImageSigningRequest(imageSigningRequest *copv1.ImageSigningRequest, condition copv1.ImageSigningCondition, phase copv1.ImageSigningPhase) error {
 
-	imagesigningrequestCopy := imageSigningRequest.DeepCopy()
-	imagesigningrequestCopy.Status.Message = message
-	imagesigningrequestCopy.Status.Phase = phase
+	imageSigningRequest.Status.Conditions = append(imageSigningRequest.Status.Conditions, condition)
+	imageSigningRequest.Status.Phase = phase
 
-	if unsignedImage != "" {
-		imagesigningrequestCopy.Status.UnsignedImage = unsignedImage
-	}
-
-	if signedImage != "" {
-		imagesigningrequestCopy.Status.SignedImage = signedImage
-	}
-
-	_, err := c.copclientset.CopV1alpha1().ImageSigningRequests(imageSigningRequest.Namespace).Update(imagesigningrequestCopy)
+	_, err := c.copclientset.CopV1alpha1().ImageSigningRequests(imageSigningRequest.Namespace).Update(imageSigningRequest)
 
 	return err
 }
 
-func extractImageIdFromImageReference(dockerImageReference string) (string, string, error) {
+func newImageSigningCondition(message string, conditionStatus corev1.ConditionStatus, conditionType copv1.ImageSigningConditionType) copv1.ImageSigningCondition {
+
+	return copv1.ImageSigningCondition{
+		LastTransitionTime: metav1.Now(),
+		Message:            message,
+		Status:             conditionStatus,
+		Type:               conditionType,
+	}
+
+}
+
+func extractImageIDFromImageReference(dockerImageReference string) (string, string, error) {
 
 	dockerImageComponents := strings.Split(dockerImageReference, "@")
 
@@ -595,7 +596,50 @@ func extractImageIdFromImageReference(dockerImageReference string) (string, stri
 	}
 
 	dockerImageRegistry := dockerImageComponents[0]
-	dockerImageId := dockerImageComponents[1]
+	dockerImageID := dockerImageComponents[1]
 
-	return dockerImageRegistry, dockerImageId, nil
+	return dockerImageRegistry, dockerImageID, nil
+}
+
+func (c *Controller) updateOnInitializationFailure(message string, imageSigningRequest copv1.ImageSigningRequest) error {
+	imageSigningRequestCopy := imageSigningRequest.DeepCopy()
+
+	condition := newImageSigningCondition(message, corev1.ConditionFalse, copv1.ImageSigningConditionInitialization)
+
+	imageSigningRequestCopy.Status.StartTime = condition.LastTransitionTime
+	imageSigningRequestCopy.Status.EndTime = condition.LastTransitionTime
+
+	return c.updateImageSigningRequest(imageSigningRequestCopy, condition, copv1.PhaseFailed)
+}
+
+func (c *Controller) updateOnSigningPodLaunch(message string, unsignedImage string, imageSigningRequest copv1.ImageSigningRequest) error {
+	imageSigningRequestCopy := imageSigningRequest.DeepCopy()
+
+	condition := newImageSigningCondition(message, corev1.ConditionTrue, copv1.ImageSigningConditionInitialization)
+
+	imageSigningRequestCopy.Status.UnsignedImage = unsignedImage
+	imageSigningRequestCopy.Status.StartTime = condition.LastTransitionTime
+
+	return c.updateImageSigningRequest(imageSigningRequestCopy, condition, copv1.PhaseRunning)
+}
+
+func (c *Controller) updateOnCompletionError(message string, imageSigningRequest copv1.ImageSigningRequest) error {
+	imageSigningRequestCopy := imageSigningRequest.DeepCopy()
+
+	condition := newImageSigningCondition(message, corev1.ConditionFalse, copv1.ImageSigningConditionFinished)
+
+	imageSigningRequestCopy.Status.EndTime = condition.LastTransitionTime
+
+	return c.updateImageSigningRequest(imageSigningRequestCopy, condition, copv1.PhaseFailed)
+}
+
+func (c *Controller) updateOnCompletionSuccess(message string, signedImage string, imageSigningRequest copv1.ImageSigningRequest) error {
+	imageSigningRequestCopy := imageSigningRequest.DeepCopy()
+
+	condition := newImageSigningCondition(message, corev1.ConditionFalse, copv1.ImageSigningConditionFinished)
+
+	imageSigningRequestCopy.Status.SignedImage = signedImage
+	imageSigningRequestCopy.Status.EndTime = condition.LastTransitionTime
+
+	return c.updateImageSigningRequest(imageSigningRequestCopy, condition, copv1.PhaseCompleted)
 }

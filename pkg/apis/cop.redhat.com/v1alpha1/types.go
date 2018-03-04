@@ -1,6 +1,7 @@
 package v1alpha1
 
 import (
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -12,7 +13,7 @@ type ImageSigningRequest struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 	Spec              ImageSigningRequestSpec   `json:"spec"`
-	Status            ImageSigningRequestStatus `json:"status,omitempty"`
+	Status            ImageSigningRequestStatus `json:"status"`
 }
 
 type ImageSigningRequestSpec struct {
@@ -21,19 +22,35 @@ type ImageSigningRequestSpec struct {
 }
 
 type ImageSigningRequestStatus struct {
-	State         string `json:"state,omitempty"`
-	Message       string `json:"message,omitempty"`
-	Phase         Phase  `json:"phase,omitempty"`
-	SignedImage   string `json:"signedImage,omitempty"`
-	UnsignedImage string `json:"unsignedImage,omitempty"`
+	Conditions    []ImageSigningCondition `json:"conditions,omitempty"`
+	Phase         ImageSigningPhase       `json:"phase,omitempty"`
+	SignedImage   string                  `json:"signedImage,omitempty"`
+	UnsignedImage string                  `json:"unsignedImage,omitempty"`
+	StartTime     metav1.Time             `json:"startTime,omitempty"`
+	EndTime       metav1.Time             `json:"endTime,omitempty"`
 }
 
-type Phase string
+type ImageSigningCondition struct {
+	Status             v1.ConditionStatus        `json:"status,omitempty"`
+	Message            string                    `json:"message,omitempty"`
+	LastTransitionTime metav1.Time               `json:"lastTransitionTime,omitempty"`
+	Type               ImageSigningConditionType `json:"type,omitempty"`
+}
+
+type ImageSigningPhase string
 
 const (
-	PhaseRunning   Phase = "Running"
-	PhaseCompleted Phase = "Completed"
-	PhaseFailed    Phase = "Failed"
+	PhaseRunning   ImageSigningPhase = "Running"
+	PhaseCompleted ImageSigningPhase = "Completed"
+	PhaseFailed    ImageSigningPhase = "Failed"
+)
+
+type ImageSigningConditionType string
+
+const (
+	ImageSigningConditionInitialization = "Initialization"
+	ImageSigningConditionSigning        = "Signing"
+	ImageSigningConditionFinished       = "Finished"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
