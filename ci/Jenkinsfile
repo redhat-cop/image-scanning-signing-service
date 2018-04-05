@@ -2,7 +2,7 @@ def template = 'https://raw.githubusercontent.com/sabre1041/image-scanning-signi
 
 openshift.withCluster() {
   env.NAMESPACE =  openshift.project()
-  env.APP_NAME = "${env.JOB_NAME}".replaceAll(/-?${NAMESPACE}-?/, '').replaceAll(/-?pipeline-?/, '')
+  env.APP_NAME = "${env.JOB_NAME}".replaceAll(/-?${NAMESPACE}-?/, '').replaceAll(/-?pipeline-?/, '').replace("/", "")
 }
 
 pipeline {
