@@ -41,11 +41,11 @@ The process for building and deploying the infrastructure to support the tooling
 
 ### Prerequisites
 
-The following prerequsites must be met in order to deploy the components through the _openshift-applier_:
+The following prerequisites must be met in order to deploy the components through the _openshift-applier_:
 
 * Ansible 
 * OpenShift Command Line tool
-* An OpenShift cluster with `cluster-admin` access
+* An OpenShift environment with the ability to create `cluster` level resources
 
 ### Deployment
 
@@ -65,7 +65,7 @@ Complete the following steps to deploy the Image Scanning and Signing Service.
  
 2. Run Ansible Galaxy to pull in required Ansible dependencies
 
-		ansible-galaxy -r requirements.yml -p roles
+		ansible-galaxy install -r requirements.yml -p roles
 
 3. Login to OpenShift cluster as a user with `cluster-admin` rights
 
@@ -119,7 +119,7 @@ To declare your intent to sign the previously built image, a new `ImageSigningRe
 apiVersion: cop.redhat.com/v1alpha1
 kind: ImageSigningRequest
 metadata:
-  namespace: dotnet-app
+  name: dotnet-app
 spec:
   imageStreamTag: dotnet-example:latest
 ```
@@ -160,6 +160,29 @@ signatures:
     uid: a08ed947-15da-11e8-ae24-fa163e6706b0
   type: atomic
 ``` 
+
+### Specifying a custom GPG key to utilize
+
+Instead of leveraging the default gpg key that is configured within the cluster, users can specify a separate GPG key to use to sign the image. The GPG key is stored within a secret and injected into the signing pod at runtime.
+
+First, create a new secret within the current project containing the GPG key:
+
+```
+oc create secret mygpgkey <directory_containing_gpg_key>
+```
+
+Create a new `ImageSigningRequest` which specifies the secret and signer address:
+
+```
+apiVersion: "cop.redhat.com/v1alpha1"
+kind: ImageSigningRequest
+metadata:
+  name: dotnet-app-mygpgkey
+spec:
+  imageStreamTag: "dotnet-example:latest"
+  signingKeySecretName: mygpgkey
+  signingKeySignBy: custom-openshift@example.com
+```
 
 ### Continuous Integration and Continuous Delivery
 

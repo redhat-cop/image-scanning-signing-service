@@ -17,8 +17,9 @@ type ImageSigningRequest struct {
 }
 
 type ImageSigningRequestSpec struct {
-	ImageStreamTag string `json:"imageStreamTag"`
-	SecretName     string `json:"secretName,omitempty"`
+	ImageStreamTag       string `json:"imageStreamTag"`
+	SigningKeySecretName string `json:"signingKeySecretName,omitempty"`
+	SigningKeySignBy     string `json:"signingKeySignBy,omitempty"`
 }
 
 type ImageSigningRequestStatus struct {

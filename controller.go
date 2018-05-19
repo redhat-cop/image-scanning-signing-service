@@ -334,7 +334,51 @@ func (c *Controller) syncHandlerImageSigningRequests(key string) error {
 		} else {
 			glog.Infof("No Signatures Exist on Image '%s'", dockerImageID)
 
-			signingPodName, err := c.launchPod(fmt.Sprintf("%s:%s", dockerImageRegistry, requestIsTag), dockerImageID, string(imageSigningRequest.ObjectMeta.UID), key)
+			// Setup default values
+			gpgSecretName := c.configuration.GpgSecret
+			gpgSignBy := c.configuration.GpgSignBy
+
+			// Check if Secret if found
+			if imageSigningRequest.Spec.SigningKeySecretName != "" {
+
+				signingKeySecret, err := c.kubeclientset.CoreV1().Secrets(imageSigningRequest.Namespace).Get(imageSigningRequest.Spec.SigningKeySecretName, metav1.GetOptions{})
+
+				if k8serrors.IsNotFound(err) {
+					glog.Infof("Unable to find Secret '%s'", imageSigningRequest.Spec.SigningKeySecretName)
+					err = c.updateOnInitializationFailure(fmt.Sprintf("GPG Secret '%s' Not Found in Namespace '%s'", imageSigningRequest.Spec.SigningKeySecretName, imageSigningRequest.Namespace), *imageSigningRequest)
+
+					if err != nil {
+						return err
+					}
+
+					return nil
+				}
+
+				glog.Infof("Copying Secret '%s' to Project '%s'", imageSigningRequest.Spec.SigningKeySecretName, c.configuration.TargetProject)
+				// Create a copy
+				signingKeySecretCopyInf, _ := scheme.Scheme.DeepCopy(signingKeySecret)
+				signingKeySecretCopy := signingKeySecretCopyInf.(*corev1.Secret)
+				signingKeySecretCopy.Name = string(imageSigningRequest.ObjectMeta.UID)
+				signingKeySecretCopy.Namespace = c.configuration.TargetProject
+				signingKeySecretCopy.ResourceVersion = ""
+				signingKeySecretCopy.UID = ""
+
+				_, err = c.kubeclientset.CoreV1().Secrets(c.configuration.TargetProject).Create(signingKeySecretCopy)
+
+				if k8serrors.IsAlreadyExists(err) {
+					glog.Info("Secret already exists. Updating...")
+					_, err = c.kubeclientset.CoreV1().Secrets(c.configuration.TargetProject).Update(signingKeySecretCopy)
+				}
+
+				gpgSecretName = signingKeySecretCopy.Name
+
+				if imageSigningRequest.Spec.SigningKeySignBy != "" {
+					gpgSignBy = imageSigningRequest.Spec.SigningKeySignBy
+				}
+
+			}
+
+			signingPodName, err := c.launchPod(fmt.Sprintf("%s:%s", dockerImageRegistry, requestIsTag), dockerImageID, string(imageSigningRequest.ObjectMeta.UID), key, gpgSecretName, gpgSignBy)
 
 			if err != nil {
 				glog.Errorf("Error Occurred Creating Signing Pod '%v'", err)
@@ -506,9 +550,9 @@ func (c *Controller) handleObject(obj interface{}) {
 	}
 }
 
-func (c *Controller) launchPod(image string, imageDigest string, ownerID string, ownerReference string) (string, error) {
+func (c *Controller) launchPod(image string, imageDigest string, ownerID string, ownerReference string, gpgSecretName string, gpgSignBy string) (string, error) {
 
-	pod, err := util.CreateSigningPod(c.configuration.SignScanImage, image, imageDigest, ownerID, ownerReference, c.configuration.TargetServiceAccount, c.configuration.GpgSecret, c.configuration.GpgSignBy)
+	pod, err := util.CreateSigningPod(c.configuration.SignScanImage, image, imageDigest, ownerID, ownerReference, c.configuration.TargetServiceAccount, gpgSecretName, gpgSignBy)
 
 	if err != nil {
 		glog.Errorf("Error Generating Pod: %v'", err)
@@ -636,7 +680,7 @@ func (c *Controller) updateOnCompletionError(message string, imageSigningRequest
 func (c *Controller) updateOnCompletionSuccess(message string, signedImage string, imageSigningRequest copv1.ImageSigningRequest) error {
 	imageSigningRequestCopy := imageSigningRequest.DeepCopy()
 
-	condition := newImageSigningCondition(message, corev1.ConditionFalse, copv1.ImageSigningConditionFinished)
+	condition := newImageSigningCondition(message, corev1.ConditionTrue, copv1.ImageSigningConditionFinished)
 
 	imageSigningRequestCopy.Status.SignedImage = signedImage
 	imageSigningRequestCopy.Status.EndTime = condition.LastTransitionTime

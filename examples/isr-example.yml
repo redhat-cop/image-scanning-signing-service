@@ -3,4 +3,4 @@ kind: ImageSigningRequest
 metadata:
   name: example-image-signing-request
 spec:
-  imageStreamTag: "product-catalog:latest"
+  imageStreamTag: "dotnet-example:latest"

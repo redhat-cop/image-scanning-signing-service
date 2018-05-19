@@ -20,7 +20,7 @@ func CreateSigningPod(signScanImage string, image string, imageDigest string, ow
 				Name:            "image-signer",
 				Image:           signScanImage,
 				ImagePullPolicy: corev1.PullAlways,
-				Command:         []string{"/usr/local/bin/sign-image"},
+				Command:         []string{"/bin/bash", "-c", "mkdir -p ~/.gnupg && cp /root/gpg/* ~/.gnupg && /usr/local/bin/sign-image"},
 				Env: []corev1.EnvVar{
 					{
 						Name:      "NAMESPACE",
@@ -49,7 +49,7 @@ func CreateSigningPod(signScanImage string, image string, imageDigest string, ow
 					},
 					{
 						Name:      "gpg",
-						MountPath: "/root/.gnupg",
+						MountPath: "/root/gpg",
 					},
 				},
 			}},
