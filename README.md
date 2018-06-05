@@ -60,7 +60,7 @@ Complete the following steps to deploy the Image Scanning and Signing Service.
 
 1. Clone this repository to your local machine and navigate into the repository
 
-		git clone https://github.com/redhat-cop/image-scanning-signing-service
+		git clone https://github.com/sabre1041/image-scanning-signing-service
 		cd image-scanning-signing-service
  
 2. Run Ansible Galaxy to pull in required Ansible dependencies
