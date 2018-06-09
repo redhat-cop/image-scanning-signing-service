@@ -3,6 +3,7 @@ FROM registry.access.redhat.com/rhel7/rhel
 ENV OCP_VERSION=3.7
 
 ADD bin/sign-image /usr/local/bin/
+RUN subscription-manager refresh
 
 RUN rpm -ihv https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm && \
     yum repolist > /dev/null && \
