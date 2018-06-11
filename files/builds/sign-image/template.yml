@@ -62,7 +62,7 @@ parameters:
 - description: Git source URL for application
   name: SOURCE_REPOSITORY_URL
   required: true
-  value: https://github.com/sabre1041/image-scanning-signing-service
+  value: https://github.com/akram/image-scanning-signing-service
 - description: Path within Git repository to build; empty for root of repository
   name: CONTEXT_DIR
   value: images/image-sign-scan-base

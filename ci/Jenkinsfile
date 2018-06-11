@@ -1,4 +1,4 @@
-def template = 'https://raw.githubusercontent.com/sabre1041/image-scanning-signing-service/master/examples/image-signing-request-template.yml'
+def template = 'https://raw.githubusercontent.com/akram/image-scanning-signing-service/master/examples/image-signing-request-template.yml'
 
 openshift.withCluster() {
   env.NAMESPACE =  openshift.project()
