@@ -29,7 +29,7 @@ One of the key traits of OpenShift is that the platform provides the ability for
 
 The image scanning and signing service takes advantage of two key concepts in the OpenShift ecosystem:
 
-* [Controllers](https://kubernetes.io/docs/reference/generated/kube-controller-manager/) - A non-terminating loop that regulates the state of the system.
+* [Operators](https://coreos.com/operators/) - Method of packaging, deploying, and managing Kubernetes Applications. This application leverages the [Operator SDK](https://github.com/operator-framework/operator-sdk) to streamline the development of Operators.
 * [Custom Resource Definitions](https://kubernetes.io/docs/concepts/api-extension/custom-resources/) - An extension of the OpenShift/Kubernetes API that allows users to interact with API objects in a similar manner as _Pods_
 
 When combined with the a Custom Resource Definition, a custom controller can react upon the intents specified by the user and perform a set of actions, such as triggering the scanning and signing of an image.
@@ -116,7 +116,7 @@ When the build completes, the image has been pushed to the OpenShift internal re
 To declare your intent to sign the previously built image, a new `ImageSigningRequest` can be created within the project. A typical request is shown below
 
 ```
-apiVersion: cop.redhat.com/v1alpha1
+apiVersion: cop.redhat.com/v1alpha2
 kind: ImageSigningRequest
 metadata:
   name: dotnet-app
@@ -174,7 +174,7 @@ oc create secret mygpgkey <directory_containing_gpg_key>
 Create a new `ImageSigningRequest` which specifies the secret and signer address:
 
 ```
-apiVersion: "cop.redhat.com/v1alpha1"
+apiVersion: "cop.redhat.com/v1alpha2"
 kind: ImageSigningRequest
 metadata:
   name: dotnet-app-mygpgkey

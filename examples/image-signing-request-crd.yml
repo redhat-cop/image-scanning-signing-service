@@ -4,7 +4,7 @@ metadata:
   name: imagesigningrequests.cop.redhat.com
 spec:
   group: cop.redhat.com
-  version: v1alpha1
+  version: v1alpha2
   scope: Namespaced
   names:
     plural: imagesigningrequests

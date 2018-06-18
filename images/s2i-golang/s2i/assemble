@@ -3,6 +3,8 @@
 set -e
 
 LOCAL_SOURCE_DIR=/tmp/src
+BUILD_OUTPUT=${BUILD_OUTPUT:-bin/main}
+BUILD_PATH=${BUILD_PATH:=main.go}
 
 echo
 echo "==== Beginning Go S2I Build Process ===="
@@ -10,11 +12,16 @@ echo
 
 pushd $LOCAL_SOURCE_DIR >/dev/null 2>&1
 
-pkgName="$(go list -e -f '{{.ImportComment}}' 2>/dev/null || true)"
+
+if [ ! -z "${GO_IMPORT_PATH}" ]; then
+  pkgName="${GO_IMPORT_PATH}"
+else 
+  pkgName="$(go list -e -f '{{.ImportComment}}' 2>/dev/null || true)"
+fi
 
 if [ -z "$pkgName" ];
 then
-  echo "Error: Must add canonical import path to root package"
+  echo "Error: Must add canonical import path to root package or provide via GO_IMPORT_PATH environment variable"
   exit 992
 fi
 
@@ -38,10 +45,10 @@ echo "--> Beginning Go Project $pkgName =="
 echo
 
 # Build code
-go build -v -o main
+go build -v -o ${BUILD_OUTPUT} ${BUILD_PATH}
 
 # Move built binary to gobin
-mv main $GOBIN
+mv ${BUILD_OUTPUT} $GOBIN
 
 # Remove source
 rm -rf $GOPATH/src/*

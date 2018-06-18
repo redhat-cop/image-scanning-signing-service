@@ -26,6 +26,11 @@ objects:
       type: Git
     strategy:
       sourceStrategy:
+        env:
+        - name: GO_IMPORT_PATH
+          value: github.com/redhat-cop/image-scanning-signing-service
+        - name: BUILD_PATH
+          value: cmd/image-scanning-signing-service/main.go
         from:
           kind: ImageStreamTag
           name: ${FROM_IMAGE}
@@ -51,3 +56,11 @@ parameters:
   name: SOURCE_REPOSITORY_URL
   required: true
   value: https://github.com/sabre1041/image-scanning-signing-service
+- description: Go Import Path
+  name: GO_IMPORT_PATH
+  required: true
+  value: github.com/redhat-cop/image-scanning-signing-service-operator
+- description: Build Path
+  name: BUILD_PATH
+  required: true
+  value: cmd/image-scanning-signing-service/main.go

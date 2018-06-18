@@ -1,4 +1,4 @@
-apiVersion: "cop.redhat.com/v1alpha1"
+apiVersion: "cop.redhat.com/v1alpha2"
 kind: ImageSigningRequest
 metadata:
   name: example-image-signing-request

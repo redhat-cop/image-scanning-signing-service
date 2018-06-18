@@ -6,7 +6,7 @@ metadata:
     openshift.io/display-name: Image Signing Request Template
     description: Template to create an Image Signing Request
 objects:
-- apiVersion: "cop.redhat.com/v1alpha1"
+- apiVersion: "cop.redhat.com/v1alpha2"
   kind: ImageSigningRequest
   metadata:
     name: ${IMAGE_SIGNING_REQUEST_NAME}
