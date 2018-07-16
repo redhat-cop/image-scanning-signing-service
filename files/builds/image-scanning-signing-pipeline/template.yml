@@ -37,6 +37,8 @@ objects:
           value: ${BUILD_APP_TAG}
         - name: DEPLOY_APP_TAG
           value: ${DEPLOY_APP_TAG}
+        - name: SKIP_FAILED_SCANS
+          value: ${SKIP_FAILED_SCANS}
 - apiVersion: v1
   kind: BuildConfig
   metadata:
@@ -97,3 +99,8 @@ parameters:
   name: BUILD_APP_TAG
   required: true
   value: latest
+- description: Whether to skip failed image scans
+  displayName: Skip failed image scans
+  name: SKIP_FAILED_SCANS
+  required: true
+  value: "false"

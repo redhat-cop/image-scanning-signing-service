@@ -1,8 +1,8 @@
 FROM registry.access.redhat.com/rhel7/rhel
 
-ENV OCP_VERSION=3.7
+ARG OCP_VERSION=3.9
 
-ADD bin/sign-image /usr/local/bin/
+ADD bin/sign-image bin/scan-image /usr/local/bin/
 
 RUN rpm -ihv https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm && \
     yum repolist > /dev/null && \

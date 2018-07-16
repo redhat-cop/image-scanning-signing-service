@@ -1,8 +1,10 @@
 def template = 'https://raw.githubusercontent.com/sabre1041/image-scanning-signing-service/master/examples/image-signing-request-template.yml'
+def scanTemplate = 'https://raw.githubusercontent.com/sabre1041/image-scanning-signing-service/master/examples/image-scanning-request-template.yml'
+
 
 openshift.withCluster() {
   env.NAMESPACE =  openshift.project()
-  env.APP_NAME = "${env.JOB_NAME}".replaceAll(/-?${NAMESPACE}-?/, '').replaceAll(/-?pipeline-?/, '')
+  env.APP_NAME = "${env.JOB_NAME}".replaceAll(/-?${env.NAMESPACE}-?/, '').replaceAll(/-?pipeline-?/, '').replaceAll('/', '')
 }
 
 pipeline {
@@ -57,6 +59,66 @@ pipeline {
             if (currentBuild.result == 'FAILURE') {
               error(buildErrorLog)
               return
+            }
+          }
+        }
+      }
+    }
+
+    stage('Scan Image') {
+      steps {
+        script {
+        def obj = "${APP_NAME}-${env.BUILD_NUMBER}"
+
+          openshift.withCluster() {
+            def created = openshift.create(openshift.process(scanTemplate, "-p IMAGE_SCANNING_REQUEST_NAME=${obj} -p IMAGE_STREAM_TAG=${APP_NAME}:${BUILD_APP_TAG}"))
+
+            def imagescanningrequest = created.narrow('imagescanningrequest').name();
+
+            echo "ImageScanningRequest ${imagescanningrequest.split('/')[1]} Created"
+
+            timeout(time: 10, unit: 'MINUTES') {
+
+              waitUntil() {
+
+                def isr = openshift.selector("${imagescanningrequest}")
+
+                if(isr.object().status) {
+
+                  def phase = isr.object().status.phase
+
+                  if(phase == "Failed") {
+                    echo "Scanning Action Failed: ${isr.object().status.message}"
+                    currentBuild.result = "FAILURE"
+                    return true
+                  }
+                  else if(phase == "Completed") {
+                    echo "Scanning Action Completed!"
+                    echo "Failed Rules: ${isr.object().status.scanResult.failedRules}"
+                    echo "Passed Rules: ${isr.object().status.scanResult.passedRules}"
+                    echo "Total Rules: ${isr.object().status.scanResult.totalRules}"
+                    env.FAILED_RULES = "${isr.object().status.scanResult.failedRules}"
+                    return true
+                  }
+                }
+                else {
+                  echo "Status is null"
+                }
+
+                return false
+
+              }
+            }
+          }
+
+          def failedRules = "${env.FAILED_RULES}" as int
+
+          if(failedRules > 0) {
+            if("true" == "${env.SKIP_FAILED_SCANS}") {
+              echo "Scan Contains ${failedRules} Rules! Failure Bypass Parameter Set. Continuing Build."
+            }
+            else {
+              error("Scan Contains ${failedRules} Rules! Failing Build!")
             }
           }
         }

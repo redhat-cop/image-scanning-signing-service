@@ -28,6 +28,7 @@ func init() {
 func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&ImageSigningRequest{},
+		&ImageScanningRequest{},
 		&ImageSigningRequestList{},
 	)
 	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)

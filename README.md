@@ -111,7 +111,7 @@ oc get builds
 
 When the build completes, the image has been pushed to the OpenShift internal registry and the _latest_ tag is updated on the ImageStream. This can be verified by running `oc get is`
 
-### Declare an Intent to Sign the Image  
+### Declare an Intent to Sign the Image
 
 To declare your intent to sign the previously built image, a new `ImageSigningRequest` can be created within the project. A typical request is shown below
 
@@ -134,7 +134,7 @@ A template is available to streamline generating an `ImageSigningRequest` in the
 To create a new `ImageSigningRequest` with the name _dotnet-example_ and the ImageStreamTag _dotnet-example:latest_, execute the following command:
 
 ```
-oc process -f examples/image-signing-request-template.yml -p IMAGE_SIGNING_REQUEST_NAME=dotnet-example IMAGE_STREAM_TAG=dotnet-example | oc apply -f-
+oc process -f examples/image-signing-request-template.yml -p IMAGE_SIGNING_REQUEST_NAME=dotnet-example IMAGE_STREAM_TAG=dotnet-example:latest | oc apply -f-
 ```
 
 Confirm the new `ImageSigningRequest` was successfully created by running `oc get imagesigningrequests`
@@ -183,6 +183,68 @@ spec:
   signingKeySecretName: mygpgkey
   signingKeySignBy: custom-openshift@example.com
 ```
+
+### Declare an Intent to Scan The Image
+
+To declare your intent to scan the previously built image, a new `ImageScanningRequest` can be created within the project. A typical request is shown below
+
+```
+apiVersion: cop.redhat.com/v1alpha2
+kind: ImageScanningRequest
+metadata:
+  name: dotnet-app
+spec:
+  imageStreamTag: dotnet-example:latest
+```
+
+As seen in the example above, the key field of note is the name of the object (dotnet-example) and the imageStreamTag (dotnet-example:latest).
+
+A template is available to streamline generating an `ImageScanningRequest` in the `examples/image-scanning-request-template.yml` file. Two parameters are required:
+
+* Name of the object to be created
+* ImageStreamTag of the image that should be scanned in the current project
+
+To create a new `ImageScanningRequest` with the name _dotnet-example_ and the ImageStreamTag _dotnet-example:latest_, execute the following command:
+
+```
+oc process -f examples/image-scanning-request-template.yml -p IMAGE_SCANNING_REQUEST_NAME=dotnet-example IMAGE_STREAM_TAG=dotnet-example:latest | oc apply -f-
+```
+
+Confirm the new `ImageScanningRequest` was successfully created by running `oc get imagescanningrequests`
+
+As soon as the object is created, the controller will create a new scanning pod in the _image-management_ project. This can be seen by running `oc get pods -n image-management`. Feel free to track the status of the scanning action by viewing the logs from the scanning pod. 
+
+Once the scan completes, a WebDav server is started within the pod to host the reports. The controller will communicate with the pod and retrieve the results. The `ImageSigningRequest` will be updated and contain the statistics from the scan in the _scanResult_ section of the _Status_ section. Confirm this by running `oc get imagescanningrequest dotnet-example -o yaml`.
+
+Finally, the newly created Image will contain the results associated with the scanning action. This can be confirmed by running the following command:
+
+``
+oc get imagescanningrequest dotnet-example -o yaml
+```
+
+Confirm the response contains a _signatures_ section similar to the following:
+
+```
+status:
+  conditions:
+  - lastTransitionTime: 2018-07-16T14:34:20Z
+    message: Scanning Pod Launched 'image-management/42b15f17-8905-11e8-961e-fa163e236d0f'
+    status: "True"
+    type: Initialization
+  - lastTransitionTime: 2018-07-16T14:35:04Z
+    message: Image Scanned
+    status: "True"
+    type: Finished
+  endTime: 2018-07-16T14:35:04Z
+  phase: Completed
+  scanResult:
+    failedRules: 2
+    passedRules: 659
+    totalRules: 661
+  startTime: 2018-07-16T14:34:20Z
+``` 
+
+Notice the _scanResult_ field which contains the results of the scan. 
 
 ### Continuous Integration and Continuous Delivery
 

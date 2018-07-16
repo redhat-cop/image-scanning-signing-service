@@ -2,26 +2,28 @@ package stub
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"strings"
+	"net/http"
+	"time"
 
-	imagev1 "github.com/openshift/api/image/v1"
+	"github.com/operator-framework/operator-sdk/pkg/k8sclient"
 	"github.com/operator-framework/operator-sdk/pkg/sdk"
 	"github.com/redhat-cop/image-scanning-signing-service/pkg/apis/cop/v1alpha2"
+	"github.com/redhat-cop/image-scanning-signing-service/pkg/common"
 	"github.com/redhat-cop/image-scanning-signing-service/pkg/config"
+	"github.com/redhat-cop/image-scanning-signing-service/pkg/openscap"
+	"github.com/redhat-cop/image-scanning-signing-service/pkg/scanning"
+	"github.com/redhat-cop/image-scanning-signing-service/pkg/signing"
 	"github.com/redhat-cop/image-scanning-signing-service/pkg/util"
+	"k8s.io/apimachinery/pkg/util/net"
+
+	"encoding/xml"
+
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/cache"
-)
-
-const (
-	controllerAgentName = "image-scan-sign-controller"
-	ownerAnnotation     = "cop.redhat.com/owner"
 )
 
 func NewHandler(config config.Config) sdk.Handler {
@@ -43,18 +45,9 @@ func (h *Handler) Handle(ctx context.Context, event sdk.Event) error {
 
 			emptyPhase := v1alpha2.ImageSigningRequestStatus{}.Phase
 			if imageSigningRequest.Status.Phase == emptyPhase {
-				_, requestIsTag := parseImageStreamTag(imageSigningRequest.Spec.ImageStreamTag)
+				_, requestIsTag := util.ParseImageStreamTag(imageSigningRequest.Spec.ImageStreamTag)
 
-				requestImageStreamTag := &imagev1.ImageStreamTag{
-					TypeMeta: metav1.TypeMeta{
-						Kind:       "ImageStreamTag",
-						APIVersion: "image.openshift.io/v1",
-					},
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      imageSigningRequest.Spec.ImageStreamTag,
-						Namespace: imageSigningRequest.ObjectMeta.Namespace,
-					},
-				}
+				requestImageStreamTag := util.GenerateImageStreamTag(imageSigningRequest.Spec.ImageStreamTag, imageSigningRequest.ObjectMeta.Namespace)
 
 				err := sdk.Get(requestImageStreamTag)
 
@@ -69,7 +62,7 @@ func (h *Handler) Handle(ctx context.Context, event sdk.Event) error {
 					}
 
 					logrus.Warnf(errorMessage)
-					err = updateOnInitializationFailure(errorMessage, *imageSigningRequest)
+					err = signing.UpdateOnImageSigningInitializationFailure(errorMessage, *imageSigningRequest)
 
 					if err != nil {
 						return err
@@ -79,7 +72,7 @@ func (h *Handler) Handle(ctx context.Context, event sdk.Event) error {
 
 				}
 
-				dockerImageRegistry, dockerImageID, err := extractImageIDFromImageReference(requestImageStreamTag.Image.DockerImageReference)
+				dockerImageRegistry, dockerImageID, err := util.ExtractImageIDFromImageReference(requestImageStreamTag.Image.DockerImageReference)
 
 				if err != nil {
 					return err
@@ -90,7 +83,7 @@ func (h *Handler) Handle(ctx context.Context, event sdk.Event) error {
 
 					logrus.Warnf(errorMessage)
 
-					err = updateOnInitializationFailure(errorMessage, *imageSigningRequest)
+					err = signing.UpdateOnImageSigningInitializationFailure(errorMessage, *imageSigningRequest)
 
 					if err != nil {
 						return err
@@ -125,7 +118,7 @@ func (h *Handler) Handle(ctx context.Context, event sdk.Event) error {
 
 							errorMessage := fmt.Sprintf("GPG Secret '%s' Not Found in Namespace '%s'", imageSigningRequest.Spec.SigningKeySecretName, imageSigningRequest.Namespace)
 							logrus.Warnf(errorMessage)
-							err = updateOnInitializationFailure(errorMessage, *imageSigningRequest)
+							err = signing.UpdateOnImageSigningInitializationFailure(errorMessage, *imageSigningRequest)
 
 							if err != nil {
 								return err
@@ -157,14 +150,14 @@ func (h *Handler) Handle(ctx context.Context, event sdk.Event) error {
 
 					}
 
-					signingPodName, err := launchPod(h.config, fmt.Sprintf("%s:%s", dockerImageRegistry, requestIsTag), dockerImageID, string(imageSigningRequest.ObjectMeta.UID), imageSigningRequestMetadataKey, gpgSecretName, gpgSignBy)
+					signingPodName, err := signing.LaunchSigningPod(h.config, fmt.Sprintf("%s:%s", dockerImageRegistry, requestIsTag), dockerImageID, string(imageSigningRequest.ObjectMeta.UID), imageSigningRequestMetadataKey, gpgSecretName, gpgSignBy)
 
 					if err != nil {
 						errorMessage := fmt.Sprintf("Error Occurred Creating Signing Pod '%v'", err)
 
 						logrus.Errorf(errorMessage)
 
-						err = updateOnInitializationFailure(errorMessage, *imageSigningRequest)
+						err = signing.UpdateOnImageSigningInitializationFailure(errorMessage, *imageSigningRequest)
 
 						if err != nil {
 							return err
@@ -175,7 +168,7 @@ func (h *Handler) Handle(ctx context.Context, event sdk.Event) error {
 
 					logrus.Infof("Signing Pod Launched '%s'", signingPodName)
 
-					err = updateOnSigningPodLaunch(fmt.Sprintf("Signing Pod Launched '%s'", signingPodName), dockerImageID, *imageSigningRequest)
+					err = signing.UpdateOnSigningPodLaunch(fmt.Sprintf("Signing Pod Launched '%s'", signingPodName), dockerImageID, *imageSigningRequest)
 
 					if err != nil {
 						return err
@@ -188,81 +181,66 @@ func (h *Handler) Handle(ctx context.Context, event sdk.Event) error {
 
 		}
 
-	case *corev1.Pod:
+	case *v1alpha2.ImageScanningRequest:
+		if !event.Deleted {
 
-		pod := o
-		podMetadataKey, _ := cache.MetaNamespaceKeyFunc(pod)
+			imageScanningRequest := o
+			imageScanningRequestMetadataKey, _ := cache.MetaNamespaceKeyFunc(imageScanningRequest)
 
-		// Defensive mechanisms
-		if pod.ObjectMeta.GetAnnotations() == nil || pod.ObjectMeta.GetAnnotations()[ownerAnnotation] == "" {
-			return nil
-		}
+			emptyPhase := v1alpha2.ImageScanningRequestStatus{}.Phase
+			if imageScanningRequest.Status.Phase == emptyPhase {
+				_, requestIsTag := util.ParseImageStreamTag(imageScanningRequest.Spec.ImageStreamTag)
 
-		podOwnerAnnotation := pod.Annotations[ownerAnnotation]
+				requestImageStreamTag := util.GenerateImageStreamTag(imageScanningRequest.Spec.ImageStreamTag, imageScanningRequest.ObjectMeta.Namespace)
 
-		isrNamespace, isrName, err := cache.SplitMetaNamespaceKey(podOwnerAnnotation)
+				err := sdk.Get(requestImageStreamTag)
 
-		imageSigningRequest := &v1alpha2.ImageSigningRequest{
-			TypeMeta: metav1.TypeMeta{
-				Kind:       "ImageSigningRequest",
-				APIVersion: "cop.redhat.com/v1alpha2",
-			},
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      isrName,
-				Namespace: isrNamespace,
-			},
-		}
+				if err != nil {
 
-		err = sdk.Get(imageSigningRequest)
+					errorMessage := ""
 
-		if err != nil {
-			logrus.Warnf("Could not find ImageSigningRequest '%s' from pod '%s'", podOwnerAnnotation, podMetadataKey)
-			return nil
-		}
+					if k8serrors.IsNotFound(err) {
+						errorMessage = fmt.Sprintf("ImageStreamTag %s Not Found in Namespace %s", imageScanningRequest.Spec.ImageStreamTag, imageScanningRequest.Namespace)
+					} else {
+						errorMessage = fmt.Sprintf("Error retrieving ImageStreamTag: %v", err)
+					}
 
-		// Check if ImageSigningRequest has already been marked as Succeeded or Failed
-		if imageSigningRequest.Status.Phase == v1alpha2.PhaseCompleted || imageSigningRequest.Status.Phase == v1alpha2.PhaseFailed {
-			return nil
-		}
+					logrus.Warnf(errorMessage)
+					err = scanning.UpdateOnImageScanningInitializationFailure(errorMessage, *imageScanningRequest)
 
-		// Check to verfiy ImageSigningRequest is in phase Running
-		if imageSigningRequest.Status.Phase != v1alpha2.PhaseRunning {
-			return nil
-		}
+					if err != nil {
+						return err
+					}
 
-		// Check if Failed
-		if pod.Status.Phase == corev1.PodFailed {
-			logrus.Infof("Signing Pod Failed. Updating ImageSiginingRequest %s", podOwnerAnnotation)
+					return nil
 
-			err = updateOnCompletionError(fmt.Sprintf("Signing Pod Failed '%v'", err), *imageSigningRequest)
+				}
 
-			if err != nil {
-				return err
-			}
+				dockerImageRegistry, dockerImageID, err := util.ExtractImageIDFromImageReference(requestImageStreamTag.Image.DockerImageReference)
 
-			return nil
+				if err != nil {
+					return err
+				}
 
-		} else if pod.Status.Phase == corev1.PodSucceeded {
+				scanningPodName, err := scanning.LaunchScanningPod(h.config, fmt.Sprintf("%s:%s", dockerImageRegistry, requestIsTag), string(imageScanningRequest.ObjectMeta.UID), imageScanningRequestMetadataKey)
 
-			requestImageStreamTag := &imagev1.ImageStreamTag{
-				TypeMeta: metav1.TypeMeta{
-					Kind:       "ImageStreamTag",
-					APIVersion: "image.openshift.io/v1",
-				},
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      imageSigningRequest.Spec.ImageStreamTag,
-					Namespace: imageSigningRequest.Namespace,
-				},
-			}
+				if err != nil {
+					errorMessage := fmt.Sprintf("Error Occurred Creating Scanning Pod '%v'", err)
 
-			err := sdk.Get(requestImageStreamTag)
+					logrus.Errorf(errorMessage)
 
-			if k8serrors.IsNotFound(err) {
+					err = scanning.UpdateOnImageScanningInitializationFailure(errorMessage, *imageScanningRequest)
 
-				errorMessage := fmt.Sprintf("ImageStream %s Not Found in Namespace %s", imageSigningRequest.Spec.ImageStreamTag, imageSigningRequest.Namespace)
-				logrus.Warnf(errorMessage)
+					if err != nil {
+						return err
+					}
 
-				err = updateOnCompletionError(errorMessage, *imageSigningRequest)
+					return nil
+				}
+
+				logrus.Infof("Scanning Pod Launched '%s'", scanningPodName)
+
+				err = scanning.UpdateOnScanningPodLaunch(fmt.Sprintf("Scanning Pod Launched '%s'", scanningPodName), dockerImageID, *imageScanningRequest)
 
 				if err != nil {
 					return err
@@ -272,172 +250,293 @@ func (h *Handler) Handle(ctx context.Context, event sdk.Event) error {
 
 			}
 
-			_, dockerImageID, err := extractImageIDFromImageReference(requestImageStreamTag.Image.DockerImageReference)
+		}
 
-			if err != nil {
-				return err
-			}
+	case *corev1.Pod:
 
-			if requestImageStreamTag.Image.Signatures != nil {
+		pod := o
+		podMetadataKey, _ := cache.MetaNamespaceKeyFunc(pod)
 
-				logrus.Infof("Signing Pod Succeeded. Updating ImageSiginingRequest %s", pod.Annotations[ownerAnnotation])
+		podNamespace, podName, _ := cache.SplitMetaNamespaceKey(podMetadataKey)
 
-				err = updateOnCompletionSuccess("Image Signed", dockerImageID, *imageSigningRequest)
-
-				if err != nil {
-					return err
-				}
-
-			} else {
-				err = updateOnCompletionError(fmt.Sprintf("No Signature Exists on Image '%s' After Signing Completed", dockerImageID), *imageSigningRequest)
-
-				if err != nil {
-					return err
-				}
-
-			}
-
+		// Defensive mechanisms
+		if pod.ObjectMeta.GetAnnotations() == nil || pod.ObjectMeta.GetAnnotations()[common.CopOwnerAnnotation] == "" || pod.ObjectMeta.GetAnnotations()[common.CopTypeAnnotation] == "" {
 			return nil
 		}
 
-	}
-	return nil
-}
+		podTypeAnnotation := pod.Annotations[common.CopTypeAnnotation]
 
-func launchPod(config config.Config, image string, imageDigest string, ownerID string, ownerReference string, gpgSecretName string, gpgSignBy string) (string, error) {
+		if podTypeAnnotation == common.ImageSigningTypeAnnotation {
 
-	pod, err := util.CreateSigningPod(config.SignScanImage, config.TargetProject, image, imageDigest, ownerID, ownerReference, config.TargetServiceAccount, gpgSecretName, gpgSignBy)
+			podOwnerAnnotation := pod.Annotations[common.CopOwnerAnnotation]
 
-	if err != nil {
-		logrus.Errorf("Error Generating Pod: %v'", err)
-		return "", err
-	}
+			isrNamespace, isrName, err := cache.SplitMetaNamespaceKey(podOwnerAnnotation)
 
-	err = sdk.Create(pod)
+			imageSigningRequest := &v1alpha2.ImageSigningRequest{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "ImageSigningRequest",
+					APIVersion: "cop.redhat.com/v1alpha2",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      isrName,
+					Namespace: isrNamespace,
+				},
+			}
 
-	if err != nil {
-		logrus.Errorf("Error Creating Pod: %v'", err)
-		return "", err
-	}
+			err = sdk.Get(imageSigningRequest)
 
-	var key string
-	if key, err = cache.MetaNamespaceKeyFunc(pod); err != nil {
-		runtime.HandleError(err)
-		return "", err
-	}
+			if err != nil {
+				logrus.Warnf("Could not find ImageSigningRequest '%s' from pod '%s'", podOwnerAnnotation, podMetadataKey)
+				return nil
+			}
 
-	return key, nil
-}
+			// Check if ImageSigningRequest has already been marked as Succeeded or Failed
+			if imageSigningRequest.Status.Phase == v1alpha2.PhaseCompleted || imageSigningRequest.Status.Phase == v1alpha2.PhaseFailed {
+				return nil
+			}
 
-func updateImageSigningRequest(imageSigningRequest *v1alpha2.ImageSigningRequest, condition v1alpha2.ImageSigningCondition, phase v1alpha2.ImageSigningPhase) error {
+			// Check to verfiy ImageSigningRequest is in phase Running
+			if imageSigningRequest.Status.Phase != v1alpha2.PhaseRunning {
+				return nil
+			}
 
-	imageSigningRequest.Status.Conditions = append(imageSigningRequest.Status.Conditions, condition)
-	imageSigningRequest.Status.Phase = phase
+			// Check if Failed
+			if pod.Status.Phase == corev1.PodFailed {
+				logrus.Infof("Signing Pod Failed. Updating ImageSiginingRequest %s", podOwnerAnnotation)
 
-	err := sdk.Update(imageSigningRequest)
+				err = signing.UpdateOnImageSigningCompletionError(fmt.Sprintf("Signing Pod Failed '%v'", err), *imageSigningRequest)
 
-	return err
-}
-
-func extractImageIDFromImageReference(dockerImageReference string) (string, string, error) {
-
-	dockerImageComponents := strings.Split(dockerImageReference, "@")
-
-	if len(dockerImageComponents) != 2 {
-		return "", "", errors.New("Unexpected Docker Image Reference")
-	}
-
-	dockerImageRegistry := dockerImageComponents[0]
-	dockerImageID := dockerImageComponents[1]
-
-	return dockerImageRegistry, dockerImageID, nil
-}
-
-func updateOnSigningPodLaunch(message string, unsignedImage string, imageSigningRequest v1alpha2.ImageSigningRequest) error {
-	imageSigningRequestCopy := imageSigningRequest.DeepCopy()
-
-	condition := newImageSigningCondition(message, corev1.ConditionTrue, v1alpha2.ImageSigningConditionInitialization)
-
-	imageSigningRequestCopy.Status.UnsignedImage = unsignedImage
-	imageSigningRequestCopy.Status.StartTime = condition.LastTransitionTime
-
-	return updateImageSigningRequest(imageSigningRequestCopy, condition, v1alpha2.PhaseRunning)
-}
-
-func updateOnInitializationFailure(message string, imageSigningRequest v1alpha2.ImageSigningRequest) error {
-	imageSigningRequestCopy := imageSigningRequest.DeepCopy()
-
-	condition := newImageSigningCondition(message, corev1.ConditionFalse, v1alpha2.ImageSigningConditionInitialization)
-
-	imageSigningRequestCopy.Status.StartTime = condition.LastTransitionTime
-	imageSigningRequestCopy.Status.EndTime = condition.LastTransitionTime
-
-	return updateImageSigningRequest(imageSigningRequestCopy, condition, v1alpha2.PhaseFailed)
-}
-
-func updateOnCompletionError(message string, imageSigningRequest v1alpha2.ImageSigningRequest) error {
-	imageSigningRequestCopy := imageSigningRequest.DeepCopy()
-
-	condition := newImageSigningCondition(message, corev1.ConditionFalse, v1alpha2.ImageSigningConditionFinished)
-
-	imageSigningRequestCopy.Status.EndTime = condition.LastTransitionTime
-
-	return updateImageSigningRequest(imageSigningRequestCopy, condition, v1alpha2.PhaseFailed)
-}
-
-func updateOnCompletionSuccess(message string, signedImage string, imageSigningRequest v1alpha2.ImageSigningRequest) error {
-	imageSigningRequestCopy := imageSigningRequest.DeepCopy()
-
-	condition := newImageSigningCondition(message, corev1.ConditionTrue, v1alpha2.ImageSigningConditionFinished)
-
-	imageSigningRequestCopy.Status.SignedImage = signedImage
-	imageSigningRequestCopy.Status.EndTime = condition.LastTransitionTime
-
-	return updateImageSigningRequest(imageSigningRequestCopy, condition, v1alpha2.PhaseCompleted)
-}
-
-func newImageSigningCondition(message string, conditionStatus corev1.ConditionStatus, conditionType v1alpha2.ImageSigningConditionType) v1alpha2.ImageSigningCondition {
-
-	return v1alpha2.ImageSigningCondition{
-		LastTransitionTime: metav1.Now(),
-		Message:            message,
-		Status:             conditionStatus,
-		Type:               conditionType,
-	}
-
-}
-
-func parseImageStreamTag(imageStreamTag string) (string, string) {
-	requestIsNameTag := strings.Split(imageStreamTag, ":")
-
-	requestIsName := requestIsNameTag[0]
-
-	var requestIsTag string
-
-	if len(requestIsNameTag) == 2 {
-		requestIsTag = requestIsNameTag[1]
-	} else {
-		requestIsTag = "latest"
-	}
-
-	return requestIsName, requestIsTag
-
-}
-
-func latestTaggedImage(stream *imagev1.ImageStream, tag string) *imagev1.TagEvent {
-
-	// find the most recent tag event with an image reference
-	if stream.Status.Tags != nil {
-		for _, t := range stream.Status.Tags {
-			if t.Tag == tag {
-				if len(t.Items) == 0 {
-					return nil
+				if err != nil {
+					return err
 				}
-				return &t.Items[0]
+
+				return nil
+
+			} else if pod.Status.Phase == corev1.PodSucceeded {
+
+				requestImageStreamTag := util.GenerateImageStreamTag(imageSigningRequest.Spec.ImageStreamTag, imageSigningRequest.Namespace)
+
+				err := sdk.Get(requestImageStreamTag)
+
+				if k8serrors.IsNotFound(err) {
+
+					errorMessage := fmt.Sprintf("ImageStream %s Not Found in Namespace %s", imageSigningRequest.Spec.ImageStreamTag, imageSigningRequest.Namespace)
+					logrus.Warnf(errorMessage)
+
+					err = signing.UpdateOnImageSigningCompletionError(errorMessage, *imageSigningRequest)
+
+					if err != nil {
+						return err
+					}
+
+					return nil
+
+				}
+
+				_, dockerImageID, err := util.ExtractImageIDFromImageReference(requestImageStreamTag.Image.DockerImageReference)
+
+				if err != nil {
+					return err
+				}
+
+				if requestImageStreamTag.Image.Signatures != nil {
+
+					logrus.Infof("Signing Pod Succeeded. Updating ImageSiginingRequest %s", pod.Annotations[common.CopOwnerAnnotation])
+
+					err = signing.UpdateOnImageSigningCompletionSuccess("Image Signed", dockerImageID, *imageSigningRequest)
+
+					if err != nil {
+						return err
+					}
+
+				} else {
+					err = signing.UpdateOnImageSigningCompletionError(fmt.Sprintf("No Signature Exists on Image '%s' After Signing Completed", dockerImageID), *imageSigningRequest)
+
+					if err != nil {
+						return err
+					}
+
+				}
+
+				return nil
+			}
+		} else if podTypeAnnotation == common.ImageScanningTypeAnnotation {
+			podOwnerAnnotation := pod.Annotations[common.CopOwnerAnnotation]
+
+			isrNamespace, isrName, err := cache.SplitMetaNamespaceKey(podOwnerAnnotation)
+
+			imageScanningRequest := &v1alpha2.ImageScanningRequest{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "ImageScanningRequest",
+					APIVersion: "cop.redhat.com/v1alpha2",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      isrName,
+					Namespace: isrNamespace,
+				},
+			}
+
+			err = sdk.Get(imageScanningRequest)
+
+			if err != nil {
+				logrus.Warnf("Could not find ImageScanningRequest '%s' from pod '%s'", podOwnerAnnotation, podMetadataKey)
+				return nil
+			}
+
+			// Check if ImageScanningRequest has already been marked as Succeeded or Failed
+			if imageScanningRequest.Status.Phase == v1alpha2.PhaseCompleted || imageScanningRequest.Status.Phase == v1alpha2.PhaseFailed {
+				return nil
+			}
+
+			// Check to verfiy ImageSigningRequest is in phase Running
+			if imageScanningRequest.Status.Phase != v1alpha2.PhaseRunning {
+				return nil
+			}
+
+			// Check if Failed
+			if pod.Status.Phase == corev1.PodFailed {
+				logrus.Infof("Scanning Pod Failed. Updating ImageSiginingRequest %s", podOwnerAnnotation)
+
+				err = scanning.UpdateOnImageScanningCompletionError(fmt.Sprintf("Scanning Pod Failed '%v'", err), *imageScanningRequest)
+
+				if err != nil {
+					return err
+				}
+
+				return nil
+
+			} else if pod.Status.Phase == corev1.PodRunning {
+				logrus.Infof("Scanning Pod '%s' in Namespace '%s' is Running. Waiting for Scan to Complete...", podName, podNamespace)
+
+				var delay = time.Duration(10) * time.Second
+				attempts := 20
+
+				c1 := make(chan bool)
+
+				go func() {
+
+					for i := 1; i <= attempts; i++ {
+
+						healthRequest := k8sclient.GetKubeClient().Core().RESTClient().Get().
+							Namespace(podNamespace).
+							Resource("pods").
+							SubResource("proxy").
+							Name(net.JoinSchemeNamePort("http", podName, "8080")).
+							Suffix("healthz")
+
+						result := healthRequest.Do()
+						var statusCode int
+						result.StatusCode(&statusCode)
+
+						if http.StatusOK == statusCode {
+							c1 <- true
+							return
+						}
+						time.Sleep(delay)
+					}
+
+					c1 <- false
+				}()
+
+				podHealthy := <-c1
+
+				if podHealthy {
+
+					logrus.Infoln("Retrieving OpenSCAP Report")
+
+					openSCAPReportResult := k8sclient.GetKubeClient().Core().RESTClient().Get().
+						Namespace(podNamespace).
+						Resource("pods").
+						SubResource("proxy").
+						Name(net.JoinSchemeNamePort("http", podName, "8080")).
+						Suffix("/api/v1/openscap").Do()
+
+					failedRules, passedRules, totalRules := 0, 0, 0
+
+					var openSCAPReport openscap.OpenSCAPReport
+
+					resp, err := openSCAPReportResult.Raw()
+
+					if err != nil {
+						logrus.Errorf("Failed to Retrieve OpenScap Report %v", err)
+
+						err = scanning.UpdateOnImageScanningCompletionError("OpenSCAP Report Retrieval Failure", *imageScanningRequest)
+
+						if err != nil {
+							return err
+						}
+
+						return nil
+					}
+
+					err = xml.Unmarshal(resp, &openSCAPReport)
+
+					if err != nil {
+						logrus.Errorf("Failed Unmarshalling OpenSCAP Report %v", err)
+
+						err = scanning.UpdateOnImageScanningCompletionError("Failed Unmarshalling OpenSCAP Report", *imageScanningRequest)
+
+						if err != nil {
+							return err
+						}
+
+						return nil
+					}
+
+					for i := 0; i < len(openSCAPReport.Reports); i++ {
+						for j := 0; j < len(openSCAPReport.Reports[i].Report[i].Content.TestResult.RuleResults); j++ {
+							result := openSCAPReport.Reports[i].Report[i].Content.TestResult.RuleResults[j].Result
+
+							if result == "pass" {
+								passedRules++
+
+							} else if result == "fail" {
+								failedRules++
+							}
+
+							totalRules++
+
+						}
+					}
+
+					logrus.Infof("Scanning Pod Succeeded. Updating ImageSiginingRequest %s", pod.Annotations[common.CopOwnerAnnotation])
+
+					err = scanning.UpdateOnImageScanningCompletionSuccess("Image Scanned", totalRules, passedRules, failedRules, *imageScanningRequest)
+
+					if err != nil {
+						return err
+					}
+
+					// Best Effort Delete Scanning Pod
+					err = scanning.DeleteScanningPod(podName, podNamespace)
+
+					if err != nil {
+						logrus.Warnf("Failed to Delete Scanning Pod '%s': %v", podName, err)
+					}
+
+				} else {
+					logrus.Infof("Scanning Health Check Could Not Be Validated. Updating ImageSiginingRequest %s", podOwnerAnnotation)
+
+					err = scanning.UpdateOnImageScanningCompletionError("Health Check Validation Error", *imageScanningRequest)
+
+					if err != nil {
+						return err
+					}
+
+					// Best Effort Delete Scanning Pod
+					err = scanning.DeleteScanningPod(podName, podNamespace)
+
+					if err != nil {
+						logrus.Warnf("Failed to Delete Scanning Pod '%s': %v", podName, err)
+					}
+
+					return nil
+
+				}
+
 			}
 		}
+
 	}
-
 	return nil
-
 }

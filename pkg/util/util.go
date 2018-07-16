@@ -1,85 +1,86 @@
 package util
 
 import (
+	"errors"
+	"strings"
+
+	"github.com/redhat-cop/image-scanning-signing-service/pkg/apis/cop/v1alpha2"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	imagev1 "github.com/openshift/api/image/v1"
 )
 
-func CreateSigningPod(signScanImage string, targetProject string, image string, imageDigest string, ownerID string, ownerReference string, serviceAccount string, gpgSecret string, signBy string) (*corev1.Pod, error) {
+func NewImageExecutionCondition(message string, conditionStatus corev1.ConditionStatus, conditionType v1alpha2.ImageExecutionConditionType) v1alpha2.ImageExecutionCondition {
 
-	priv := true
+	return v1alpha2.ImageExecutionCondition{
+		LastTransitionTime: metav1.Now(),
+		Message:            message,
+		Status:             conditionStatus,
+		Type:               conditionType,
+	}
 
-	pod := &corev1.Pod{
+}
+
+func ParseImageStreamTag(imageStreamTag string) (string, string) {
+	requestIsNameTag := strings.Split(imageStreamTag, ":")
+
+	requestIsName := requestIsNameTag[0]
+
+	var requestIsTag string
+
+	if len(requestIsNameTag) == 2 {
+		requestIsTag = requestIsNameTag[1]
+	} else {
+		requestIsTag = "latest"
+	}
+
+	return requestIsName, requestIsTag
+
+}
+
+func LatestTaggedImage(stream *imagev1.ImageStream, tag string) *imagev1.TagEvent {
+
+	// find the most recent tag event with an image reference
+	if stream.Status.Tags != nil {
+		for _, t := range stream.Status.Tags {
+			if t.Tag == tag {
+				if len(t.Items) == 0 {
+					return nil
+				}
+				return &t.Items[0]
+			}
+		}
+	}
+
+	return nil
+
+}
+
+func ExtractImageIDFromImageReference(dockerImageReference string) (string, string, error) {
+
+	dockerImageComponents := strings.Split(dockerImageReference, "@")
+
+	if len(dockerImageComponents) != 2 {
+		return "", "", errors.New("Unexpected Docker Image Reference")
+	}
+
+	dockerImageRegistry := dockerImageComponents[0]
+	dockerImageID := dockerImageComponents[1]
+
+	return dockerImageRegistry, dockerImageID, nil
+}
+
+func GenerateImageStreamTag(imageStreamTag string, namespace string) *imagev1.ImageStreamTag {
+	return &imagev1.ImageStreamTag{
 		TypeMeta: metav1.TypeMeta{
-			Kind:       "Pod",
-			APIVersion: "v1",
+			Kind:       "ImageStreamTag",
+			APIVersion: "image.openshift.io/v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        ownerID,
-			Namespace:   targetProject,
-			Labels:      map[string]string{"type": "image-signing"},
-			Annotations: map[string]string{"cop.redhat.com/owner": ownerReference},
-		},
-		Spec: corev1.PodSpec{
-			Containers: []corev1.Container{{
-				Name:            "image-signer",
-				Image:           signScanImage,
-				ImagePullPolicy: corev1.PullAlways,
-				Command:         []string{"/bin/bash", "-c", "mkdir -p ~/.gnupg && cp /root/gpg/* ~/.gnupg && /usr/local/bin/sign-image"},
-				Env: []corev1.EnvVar{
-					{
-						Name:      "NAMESPACE",
-						ValueFrom: &corev1.EnvVarSource{FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.namespace"}},
-					},
-					{
-						Name:  "IMAGE",
-						Value: image,
-					},
-					{
-						Name:  "DIGEST",
-						Value: imageDigest,
-					},
-					{
-						Name:  "SIGNBY",
-						Value: signBy,
-					},
-				},
-				SecurityContext: &corev1.SecurityContext{
-					Privileged: &priv,
-				},
-				VolumeMounts: []corev1.VolumeMount{
-					{
-						Name:      "docker-socket",
-						MountPath: "/var/run/docker.sock",
-					},
-					{
-						Name:      "gpg",
-						MountPath: "/root/gpg",
-					},
-				},
-			}},
-			RestartPolicy:      corev1.RestartPolicyNever,
-			ServiceAccountName: serviceAccount,
-			Volumes: []corev1.Volume{
-				{
-					Name: "docker-socket",
-					VolumeSource: corev1.VolumeSource{
-						HostPath: &corev1.HostPathVolumeSource{
-							Path: "/var/run/docker.sock",
-						},
-					},
-				},
-				{
-					Name: "gpg",
-					VolumeSource: corev1.VolumeSource{
-						Secret: &corev1.SecretVolumeSource{
-							SecretName: gpgSecret,
-						},
-					},
-				},
-			},
+			Name:      imageStreamTag,
+			Namespace: namespace,
 		},
 	}
 
-	return pod, nil
 }

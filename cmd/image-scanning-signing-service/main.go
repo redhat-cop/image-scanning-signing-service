@@ -24,6 +24,7 @@ func main() {
 	configuration := config.LoadConfig()
 
 	sdk.Watch("cop.redhat.com/v1alpha2", "ImageSigningRequest", "", 0)
+	sdk.Watch("cop.redhat.com/v1alpha2", "ImageScanningRequest", "", 0)
 	sdk.Watch("v1", "Pod", "", 0)
 	sdk.Handle(stub.NewHandler(configuration))
 	sdk.Run(context.TODO())

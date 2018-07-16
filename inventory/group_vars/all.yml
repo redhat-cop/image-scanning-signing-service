@@ -6,6 +6,10 @@
           file: "{{ inventory_dir }}/../examples/image-signing-request-crd.yml"
           tags:
             - core
+        - name: imagescanningrequest
+          file: "{{ inventory_dir }}/../examples/image-scanning-request-crd.yml"
+          tags:
+            - core
     - object: projectrequest
       content:
         - name: image-management-project
@@ -67,8 +71,8 @@
             - core
         - name: image-sign-scan-base
           namespace: "image-management"
-          template: "{{ inventory_dir }}/../files/builds/sign-image/template.yml"
-          params: "{{ inventory_dir }}/../files/builds/sign-image/params"
+          template: "{{ inventory_dir }}/../files/builds/image-sign-scan-base/template.yml"
+          params: "{{ inventory_dir }}/../files/builds/image-sign-scan-base/params"
           tags:
             - core
         - name: image-scanning-signing-service

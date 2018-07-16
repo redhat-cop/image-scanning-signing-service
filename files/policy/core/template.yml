@@ -91,6 +91,14 @@ objects:
     - get
     - list
     - watch
+    - delete
+  - apiGroups:
+    - ""
+    attributeRestrictions: null
+    resources:
+    - pods/proxy
+    verbs:
+    - get
   - apiGroups:
     - ""
     attributeRestrictions: null
@@ -105,6 +113,7 @@ objects:
     attributeRestrictions: null
     resources:
     - imagesigningrequests
+    - imagescanningrequests
     verbs:
     - get
     - list
@@ -121,6 +130,7 @@ objects:
     attributeRestrictions: null
     resources:
     - imagesigningrequests
+    - imagescanningrequests
     verbs:
     - create
     - delete

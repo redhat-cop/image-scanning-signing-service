@@ -30,7 +30,7 @@ objects:
       type: Git
     strategy:
       dockerStrategy:
-        env:
+        buildArgs:
         - name: OCP_VERSION
           value: "${VERSION}"
         from:
@@ -50,11 +50,11 @@ parameters:
 - description: Image stream tag for the image you'd like to use to build the application
   name: FROM_IMAGE
   required: true
-  value: rhel7:7.4
+  value: rhel7:7.5
 - name: VERSION
   displayName: OpenShift Container Platform Version
   description: Version of the OpenShift Container Platform
-  value: "3.7"
+  value: "3.9"
   required: true
 - description: Git branch/tag reference
   name: SOURCE_REPOSITORY_REF
