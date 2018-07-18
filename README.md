@@ -218,7 +218,7 @@ Once the scan completes, a WebDav server is started within the pod to host the r
 
 Finally, the newly created Image will contain the results associated with the scanning action. This can be confirmed by running the following command:
 
-``
+```
 oc get imagescanningrequest dotnet-example -o yaml
 ```
 
