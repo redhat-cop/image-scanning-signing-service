@@ -65,7 +65,7 @@ Complete the following steps to deploy the Image Scanning and Signing Service.
  
 2. Run Ansible Galaxy to pull in required Ansible dependencies
 
-		ansible-galaxy install -r requirements.yml -p roles
+		ansible-galaxy install -r requirements.yml -p galaxy
 
 3. Login to OpenShift cluster as a user with `cluster-admin` rights
 
@@ -75,7 +75,7 @@ Complete the following steps to deploy the Image Scanning and Signing Service.
 
 To deploy  the core infrastructure, specify the Ansible environment variable `-e filter_tags=core` as shown below
 
-		ansible-playbook -i inventory/ roles/casl-ansible/playbooks/openshift-cluster-seed.yml -e filter_tags=core
+		ansible-playbook -i inventory/ galaxy/openshift-applier/playbooks/openshift-cluster-seed.yml -e filter_tags=core
 
 Confirm the ansible run was successful. A series of builds and deployments will occur within OpenShift. Provisioning will be successful when a pod starting with `image-scanning-signing-service` from the command `oc get pods -n image-management`
 
@@ -256,7 +256,7 @@ Similar to the deployment of the core infrastructure, this demonstration can be 
 
 Execute the following command to provision the components:
 
-		ansible-playbook -i inventory/ roles/casl-ansible/playbooks/openshift-cluster-seed.yml -e filter_tags=pipeline
+		ansible-playbook -i inventory/ galaxy/openshift-applier/playbooks/openshift-cluster-seed.yml -e filter_tags=pipeline
 
 Once complete, a new project called `image-scanning-signing-pipeline` which will contain a Jenkins server along with application build (_JenkinsPipeline_ and _Binary S2I_) along with deployment objects.
 
