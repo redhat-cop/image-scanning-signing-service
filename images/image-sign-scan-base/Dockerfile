@@ -5,7 +5,7 @@ ARG OCP_VERSION=3.9
 ADD bin/sign-image bin/scan-image /usr/local/bin/
 
 RUN yum repolist > /dev/null && \
-    wget -O jq https://github.com/stedolan/jq/releases/download/jq-1.5/jq-linux64 && \
+    curl -o jq https://github.com/stedolan/jq/releases/download/jq-1.5/jq-linux64 && \
     chmod +x ./jq && \
     cp jq /usr/bin && \
     yum clean all && \
