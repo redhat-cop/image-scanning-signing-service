@@ -50,8 +50,9 @@
             - core
     - object: imagestreams
       content:
-        - name: rhel
-          file: "{{ inventory_dir }}/../files/imagestreams/images.yml"
+        - name: images
+          template: "{{ inventory_dir }}/../files/imagestreams/images.yml"
+          params: "{{ inventory_dir }}/../files/imagestreams/params"
           namespace: "image-management"
           tags:
             - core

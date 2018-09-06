@@ -75,7 +75,7 @@ parameters:
 - description: Git source URI for application
   name: PIPELINE_REPOSITORY_URL
   required: true
-  value: https://github.com/sabre1041/image-scanning-signing-service.git
+  value: https://github.com/redhat-cop/image-scanning-signing-service.git
 - description: Git branch/tag reference
   name: PIPELINE_REPOSITORY_REF
   value: "master"
