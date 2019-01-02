@@ -1,6 +1,6 @@
-FROM rhel7:latest
+FROM openshift/image-inspector:latest
 
-ARG OCP_VERSION=3.9
+ARG OCP_VERSION=${OCP_VERSION}
 
 ADD bin/sign-image bin/scan-image /usr/local/bin/
 
