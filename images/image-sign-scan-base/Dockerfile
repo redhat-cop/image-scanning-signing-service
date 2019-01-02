@@ -1,6 +1,7 @@
-FROM registry.access.redhat.com/openshift3/image-inspector:latest
+FROM openshift/image-inspector:latest
 
-ARG OCP_VERSION=3.9
+ARG OCP_VERSION
+ENV OCP_VERSION ${OCP_VERSION:-3.10}
 
 ADD bin/sign-image bin/scan-image /usr/local/bin/
 
@@ -13,3 +14,5 @@ RUN yum repolist > /dev/null && \
     yum install -y --enablerepo=rhel-7-server-ose-${OCP_VERSION}-rpms --enablerepo=rhel-7-server-extras-rpms --setopt=tsflags=nodocs $INSTALL_PKGS && \
     rpm -V $INSTALL_PKGS && \
     yum clean all
+
+#    yum install -y --enablerepo=rhel-7-server-ose-3.8-rpms --enablerepo=rhel-7-server-extras-rpms --setopt=tsflags=nodocs image-inspector && \
