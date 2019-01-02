@@ -1,6 +1,7 @@
 FROM openshift/image-inspector:latest
 
 ARG OCP_VERSION
+ENV OCP_VERSION ${OCP_VERSION:3.10}
 
 ADD bin/sign-image bin/scan-image /usr/local/bin/
 
