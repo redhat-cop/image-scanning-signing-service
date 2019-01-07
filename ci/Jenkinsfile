@@ -1,10 +1,11 @@
-def template = 'https://raw.githubusercontent.com/sabre1041/image-scanning-signing-service/master/examples/image-signing-request-template.yml'
-def scanTemplate = 'https://raw.githubusercontent.com/sabre1041/image-scanning-signing-service/master/examples/image-scanning-request-template.yml'
+def template = 'https://raw.githubusercontent.com/redhat-cop/image-scanning-signing-service/master/examples/image-signing-request-template.yml'
+def scanTemplate = 'https://raw.githubusercontent.com/redhat-cop/image-scanning-signing-service/master/examples/image-scanning-request-template.yml'
 
 
 openshift.withCluster() {
   env.NAMESPACE =  openshift.project()
   env.APP_NAME = "${env.JOB_NAME}".replaceAll(/-?${env.NAMESPACE}-?/, '').replaceAll(/-?pipeline-?/, '').replaceAll('/', '')
+  echo "begin build of " + env.APP_NAME
 }
 
 pipeline {

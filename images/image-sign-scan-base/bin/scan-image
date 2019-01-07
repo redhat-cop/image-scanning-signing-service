@@ -15,4 +15,4 @@ DOCKERCFG_SECRET_NAME=$(echo "${SA_JSON}" | jq -r ".imagePullSecrets[] | select(
 
 oc get secret -n $NAMESPACE $DOCKERCFG_SECRET_NAME -o json | jq -r ".data[] | select(\".dockercfg\")" | base64 -d > $DOCKER_CFG_HOME/.dockercfg
 
-image-inspector -chroot --path=${IMAGE_CONTENT} --scan-results-dir=${RESULTS} --scan-type=openscap --openscap-html-report --dockercfg=$DOCKER_CFG_HOME/.dockercfg --image=$IMAGE -serve=0.0.0.0:8080
+image-inspector -chroot --path=${IMAGE_CONTENT} --scan-results-dir=${RESULTS} --scan-type=openscap  --dockercfg=$DOCKER_CFG_HOME/.dockercfg --image=$IMAGE -serve=0.0.0.0:8080

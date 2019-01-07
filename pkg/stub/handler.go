@@ -499,7 +499,7 @@ func (h *Handler) Handle(ctx context.Context, event sdk.Event) error {
 						}
 					}
 
-					logrus.Infof("Scanning Pod Succeeded. Updating ImageSiginingRequest %s", pod.Annotations[common.CopOwnerAnnotation])
+					logrus.Infof("Scanning Pod Succeeded. Updating ImageScanningRequest %s", pod.Annotations[common.CopOwnerAnnotation])
 
 					err = scanning.UpdateOnImageScanningCompletionSuccess("Image Scanned", totalRules, passedRules, failedRules, *imageScanningRequest)
 
@@ -515,7 +515,7 @@ func (h *Handler) Handle(ctx context.Context, event sdk.Event) error {
 					}
 
 				} else {
-					logrus.Infof("Scanning Health Check Could Not Be Validated. Updating ImageSiginingRequest %s", podOwnerAnnotation)
+					logrus.Infof("Scanning Health Check Could Not Be Validated. Updating ImageScanningRequest %s", podOwnerAnnotation)
 
 					err = scanning.UpdateOnImageScanningCompletionError("Health Check Validation Error", *imageScanningRequest)
 

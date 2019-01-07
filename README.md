@@ -282,3 +282,8 @@ Once successful, the stage view will appear similar to the following:
 Back within the OpenShift web console, locate the address of the exposed _Route_ to access the application by hovering over _Applications_  on the lefthand navigation bar and selecting **Routes**. Click on the URL provided underneath _Hostname_.
 
 To learn more about the underlying steps that are executed within the pipeline, browse through the included [Jenkinsfile](ci/Jenkinsfile).
+
+## Known Issues
+
+* Currently, the latest version of the `image-inspector` binary suffers from a bug causing reduced functionality.
+The `--openscap-html-report` option mishandles the parsing of the `results-arf.xml` in `image-sign-scan-base` This casues the execution of image scans to fail. A workaround has been applied to the `image-sign-scan-base` image to ignore this flag. Reduced functionality of no HTML report generation for all image scan requests is expected until the upstream `image-inspector` is fixed. Please see https://github.com/openshift/image-inspector/issues/105
