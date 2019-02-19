@@ -14,12 +14,12 @@
       content:
         - name: image-management-project
           file: "{{ inventory_dir }}/../files/projects/projects-image-management.yml"
-          file_action: create
+          action: create
           tags:
             - core
         - name: image-scanning-signing-project
           file: "{{ inventory_dir }}/../files/projects/projects-image-scanning-signing-pipeline.yml"
-          file_action: create
+          action: create
           tags:
             - pipeline
     - object: policy
