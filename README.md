@@ -47,6 +47,11 @@ The following prerequisites must be met in order to deploy the components throug
 * OpenShift Command Line tool
 * An OpenShift environment with the ability to create `cluster` level resources
 
+
+For disconnected and Satellite installation, below repo must be enabled:
+
+* rhel-7-server-optional-rpms
+
 ### Deployment
 
 Currently, there are two types of deployments:
