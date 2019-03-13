@@ -1,6 +1,8 @@
 package signing
 
 import (
+	"os"
+
 	"github.com/operator-framework/operator-sdk/pkg/sdk"
 	"github.com/redhat-cop/image-scanning-signing-service/pkg/apis/cop/v1alpha2"
 	"github.com/redhat-cop/image-scanning-signing-service/pkg/config"
@@ -165,6 +167,34 @@ func createSigningPod(signScanImage string, targetProject string, image string, 
 				},
 			},
 		},
+	}
+
+	// Begin Custom Logic to support signing
+	_, sigDemoEnvVal := os.LookupEnv("SIG_DEMO")
+
+	if sigDemoEnvVal {
+
+		pod.Spec.Volumes = append(pod.Spec.Volumes, corev1.Volume{
+			Name: "sigstore",
+			VolumeSource: corev1.VolumeSource{
+				HostPath: &corev1.HostPathVolumeSource{
+					Path: "/var/lib/atomic/sigstore/",
+				},
+			},
+		})
+
+		pod.Spec.Containers[0].VolumeMounts = append(pod.Spec.Containers[0].VolumeMounts, corev1.VolumeMount{
+			Name:      "sigstore",
+			MountPath: "/var/lib/atomic/sigstore/",
+		})
+
+		pod.Spec.Containers[0].Env = append(pod.Spec.Containers[0].Env, corev1.EnvVar{
+			Name:  "PUSH_TYPE",
+			Value: "docker",
+		})
+
+		pod.Spec.NodeSelector = map[string]string{"type": "builder"}
+
 	}
 
 	return pod, nil
