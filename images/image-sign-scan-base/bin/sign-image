@@ -2,14 +2,19 @@
 
 oc login https://kubernetes.default.svc.cluster.local --certificate-authority=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt --token=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token) > /dev/null 2>&1 
 
-IMAGE_SIGNATURE_EXISTS=$(oc get images ${IMAGE_DIGEST} -o json | jq -r 'has("signatures")')
-if [ "${IMAGE_SIGNATURE_EXISTS}" == "true" ]; then
-  echo "Signature exists on image. Skipping signing"
-  exit 0
+PUSH_TYPE=${PUSH_TYPE:=atomic}
+
+if [ "${PUSH_TYPE}" == "atomic" ]; then
+
+  IMAGE_SIGNATURE_EXISTS=$(oc get images ${IMAGE_DIGEST} -o json | jq -r 'has("signatures")')
+  if [ "${IMAGE_SIGNATURE_EXISTS}" == "true" ]; then
+    echo "Signature exists on image. Skipping signing"
+    exit 0
+  fi
+
 fi
 
 SA_FULLNAME=$(oc whoami)
-PUSH_TYPE=${PUSH_TYPE:=atomic}
 SA_NAME="${SA_FULLNAME##*:}"
 NAMESPACE=$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace)
 SA_JSON=$(oc get sa -n $NAMESPACE $SA_NAME -o json)
@@ -21,17 +26,27 @@ if [ -z ${IMAGE} ]; then
   exit 1
 fi
 
-REGISTRY_HOST=${IMAGE%%/*}
-REGISTRY_CONTENTS=$(echo "$DOCKERCFG" | jq -r ". | .[\"$REGISTRY_HOST\"]")
+docker pull $IMAGE
 
-if [ "$REGISTRY_CONTENTS" != "null" ]; then
-  USERNAME=$(echo $REGISTRY_CONTENTS | jq -r .username)
-  PASSWORD=$(echo $REGISTRY_CONTENTS | jq -r .password)
-  USERNAME_PARAM="--username $USERNAME"
-  PASSWORD_PARAM="--password $PASSWORD"
-  docker login -u $USERNAME -p $PASSWORD $REGISTRY_HOST
+if [ "${PUSH_TYPE}" == "atomic" ]; then
+
+  REGISTRY_HOST=${IMAGE%%/*}
+  REGISTRY_CONTENTS=$(echo "$DOCKERCFG" | jq -r ". | .[\"$REGISTRY_HOST\"]")
+
+  if [ "$REGISTRY_CONTENTS" != "null" ]; then
+    USERNAME=$(echo $REGISTRY_CONTENTS | jq -r .username)
+    PASSWORD=$(echo $REGISTRY_CONTENTS | jq -r .password)
+    USERNAME_PARAM="--username $USERNAME"
+    PASSWORD_PARAM="--password $PASSWORD"
+    docker login -u $USERNAME -p $PASSWORD $REGISTRY_HOST
+  fi
+
+  atomic push --insecure --type ${PUSH_TYPE} --sign-by $SIGNBY $USERNAME_PARAM $PASSWORD_PARAM $IMAGE
+
+else
+
+  atomic sign --sign-by $SIGNBY $IMAGE
+
 fi
 
-docker pull $IMAGE
-atomic push --insecure --type ${PUSH_TYPE} --sign-by $SIGNBY $USERNAME_PARAM $PASSWORD_PARAM $IMAGE
 docker rmi -f $IMAGE
