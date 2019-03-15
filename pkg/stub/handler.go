@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/operator-framework/operator-sdk/pkg/k8sclient"
@@ -339,7 +340,10 @@ func (h *Handler) Handle(ctx context.Context, event sdk.Event) error {
 					return err
 				}
 
-				if requestImageStreamTag.Image.Signatures != nil {
+				// Check for demo variable
+				_, sigDemoEnvVal := os.LookupEnv("SIG_DEMO")
+
+				if requestImageStreamTag.Image.Signatures != nil || sigDemoEnvVal {
 
 					logrus.Infof("Signing Pod Succeeded. Updating ImageSiginingRequest %s", pod.Annotations[common.CopOwnerAnnotation])
 
