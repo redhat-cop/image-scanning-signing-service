@@ -1,4 +1,4 @@
-FROM registry.access.redhat.com/rhel7/rhel:7.4
+FROM registry.access.redhat.com/ubi7/ubi:7.7
 
 MAINTAINER Andrew Block <ablock@redhat.com>
 
@@ -17,7 +17,6 @@ ENV HOME=/opt/app-root \
 COPY s2i $STI_SCRIPTS_PATH
 
 RUN yum repolist > /dev/null && \
-    yum-config-manager --enable rhel-7-server-optional-rpms && \
     yum clean all && \
     INSTALL_PKGS="golang" && \
     yum install -y --setopt=tsflags=nodocs $INSTALL_PKGS && \

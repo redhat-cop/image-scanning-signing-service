@@ -15,7 +15,7 @@ objects:
 - apiVersion: v1
   kind: ImageStream
   metadata:
-    name: rhel7
+    name: ubi
   spec:
-    dockerImageRepository: registry.access.redhat.com/rhel7/rhel 
+    dockerImageRepository: registry.access.redhat.com/ubi7/ubi
 

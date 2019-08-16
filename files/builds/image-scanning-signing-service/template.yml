@@ -51,11 +51,11 @@ parameters:
   value: s2i-golang:latest
 - description: Git branch/tag reference
   name: SOURCE_REPOSITORY_REF
-  value: master
+  value: signing-webinar
 - description: Git source URL for application
   name: SOURCE_REPOSITORY_URL
   required: true
-  value: https://github.com/redhat-cop/image-scanning-signing-service
+  value: builds/image-scanning-signing-service/template.yml
 - description: Go Import Path
   name: GO_IMPORT_PATH
   required: true
