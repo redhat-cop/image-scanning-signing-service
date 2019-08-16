@@ -15,7 +15,7 @@ objects:
 - apiVersion: v1
   kind: ImageStream
   metadata:
-    name: ubi
+    name: go-toolset
   spec:
-    dockerImageRepository: registry.access.redhat.com/ubi7/ubi
+    dockerImageRepository: registry.redhat.io/rhel8/go-toolset
 

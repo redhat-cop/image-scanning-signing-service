@@ -44,10 +44,10 @@ parameters:
 - description: Image stream tag for the image you'd like to use to build the application
   name: FROM_IMAGE
   required: true
-  value: ubi:7.7
+  value: go-toolset:1.11.5
 - description: Git branch/tag reference
   name: SOURCE_REPOSITORY_REF
-  value: signing
+  value: signing-webinar
 - description: Git source URL for application
   name: SOURCE_REPOSITORY_URL
   required: true

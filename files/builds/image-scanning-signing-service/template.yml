@@ -55,7 +55,7 @@ parameters:
 - description: Git source URL for application
   name: SOURCE_REPOSITORY_URL
   required: true
-  value: builds/image-scanning-signing-service/template.yml
+  value: https://github.com/jgoldsmith613/image-scanning-signing-service
 - description: Go Import Path
   name: GO_IMPORT_PATH
   required: true
