@@ -1,4 +1,4 @@
-FROM registry.access.redhat.com/ubi7/ubi:7.7
+FROM registry.access.redhat.com/rhel8/go-toolset:1.11.6
 
 MAINTAINER Andrew Block <ablock@redhat.com>
 
@@ -16,13 +16,7 @@ ENV HOME=/opt/app-root \
 
 COPY s2i $STI_SCRIPTS_PATH
 
-RUN yum repolist > /dev/null && \
-    yum clean all && \
-    INSTALL_PKGS="golang" && \
-    yum install -y --setopt=tsflags=nodocs $INSTALL_PKGS && \
-    rpm -V $INSTALL_PKGS && \
-    yum clean all && \
-    useradd -u 1001 -r -g 0 -d ${HOME} -s /sbin/nologin -c "Default Application User" default && \
+RUN useradd -u 1001 -r -g 0 -d ${HOME} -s /sbin/nologin -c "Default Application User" default && \
     mkdir -p ${GOPATH}/{bin,src} && \
     chown -R 1001:0 ${HOME} && \
     chmod -R g+rwX ${HOME}
