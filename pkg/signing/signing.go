@@ -178,14 +178,14 @@ func createSigningPod(signScanImage string, targetProject string, image string, 
 			Name: "sigstore",
 			VolumeSource: corev1.VolumeSource{
 				HostPath: &corev1.HostPathVolumeSource{
-					Path: "/var/lib/atomic/sigstore/",
+					Path: "/var/lib/containers/sigstore/",
 				},
 			},
 		})
 
 		pod.Spec.Containers[0].VolumeMounts = append(pod.Spec.Containers[0].VolumeMounts, corev1.VolumeMount{
 			Name:      "sigstore",
-			MountPath: "/var/lib/atomic/sigstore/",
+			MountPath: "/var/lib/containers/sigstore/",
 		})
 
 		pod.Spec.Containers[0].Env = append(pod.Spec.Containers[0].Env, corev1.EnvVar{
