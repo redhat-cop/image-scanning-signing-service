@@ -9,9 +9,9 @@ objects:
 - apiVersion: v1
   kind: ImageStream
   metadata:
-    name: image-inspector
+    name: centos
   spec:
-    dockerImageRepository: registry.access.redhat.com/openshift3/image-inspector
+    dockerImageRepository: centos
 - apiVersion: v1
   kind: ImageStream
   metadata:

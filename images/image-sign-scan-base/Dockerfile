@@ -15,7 +15,7 @@ RUN yum repolist > /dev/null && \
     chmod +x ./oc && \
     cp oc /usr/bin && \
     yum clean all && \
-    INSTALL_PKGS="skopeo" && \
+    INSTALL_PKGS="podman" && \
     yum install -y --setopt=tsflags=nodocs $INSTALL_PKGS && \
     rpm -V $INSTALL_PKGS && \
     yum clean all
