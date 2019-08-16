@@ -26,7 +26,7 @@ if [ -z ${IMAGE} ]; then
   exit 1
 fi
 
-docker pull $IMAGE
+podman pull $IMAGE
 
 if [ "${PUSH_TYPE}" == "atomic" ]; then
 
@@ -38,15 +38,15 @@ if [ "${PUSH_TYPE}" == "atomic" ]; then
     PASSWORD=$(echo $REGISTRY_CONTENTS | jq -r .password)
     USERNAME_PARAM="--username $USERNAME"
     PASSWORD_PARAM="--password $PASSWORD"
-    docker login -u $USERNAME -p $PASSWORD $REGISTRY_HOST
+    podman login -u $USERNAME -p $PASSWORD $REGISTRY_HOST
   fi
 
   atomic push --insecure --type ${PUSH_TYPE} --sign-by $SIGNBY $USERNAME_PARAM $PASSWORD_PARAM $IMAGE
 
 else
 
-  atomic sign --sign-by $SIGNBY $IMAGE
+  podman image sign --sign-by $SIGNBY $IMAGE
 
 fi
 
-docker rmi -f $IMAGE
+podman rmi -f $IMAGE
