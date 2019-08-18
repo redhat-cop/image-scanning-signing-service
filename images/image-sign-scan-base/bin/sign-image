@@ -1,6 +1,10 @@
 #!/bin/bash
 
+echo "start signing"
+
 oc login https://kubernetes.default.svc.cluster.local --certificate-authority=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt --token=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token) > /dev/null 2>&1 
+
+echo "logged into ocp"
 
 PUSH_TYPE=${PUSH_TYPE:=atomic}
 
