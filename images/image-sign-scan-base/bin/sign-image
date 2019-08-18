@@ -1,5 +1,7 @@
 #!/bin/bash
 
+sleep 5
+
 echo "start signing"
 
 oc login https://kubernetes.default.svc.cluster.local --certificate-authority=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt --token=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token) > /dev/null 2>&1 
@@ -39,6 +41,8 @@ if [ -z ${IMAGE} ]; then
   echo "No Image Specified for Signing"
   exit 1
 fi
+
+sleep 5
 
 echo "starting to pull image"
 
