@@ -46,7 +46,7 @@ sleep 5
 
 echo "starting to pull image"
 
-podman pull $IMAGE
+podman pull $IMAGE --tls-verify=false
 
 echo "finished pulling image"
 
