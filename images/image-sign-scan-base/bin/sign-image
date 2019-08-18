@@ -67,7 +67,7 @@ if [ "${PUSH_TYPE}" == "atomic" ]; then
 
 else
 
-  podman image sign --sign-by $SIGNBY -d /var/lib/containers/sigstore  $IMAGE
+  podman image sign --sign-by $SIGNBY -d /var/lib/containers/sigstore  containers-storage:$IMAGE
 
 fi
 
