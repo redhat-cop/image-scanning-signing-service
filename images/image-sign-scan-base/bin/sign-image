@@ -30,7 +30,11 @@ if [ -z ${IMAGE} ]; then
   exit 1
 fi
 
+echo "starting to pull image"
+
 podman pull $IMAGE
+
+echo "finished pulling image"
 
 if [ "${PUSH_TYPE}" == "atomic" ]; then
 
