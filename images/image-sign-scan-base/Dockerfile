@@ -18,4 +18,5 @@ RUN yum repolist > /dev/null && \
     INSTALL_PKGS="podman" && \
     yum install -y --setopt=tsflags=nodocs $INSTALL_PKGS && \
     rpm -V $INSTALL_PKGS && \
-    yum clean all
+    yum clean all && \ 
+    sed 's/#mount_program/mount_program/' /etc/containers/storage.conf -i
