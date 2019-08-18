@@ -8,6 +8,8 @@ echo "logged into ocp"
 
 PUSH_TYPE=${PUSH_TYPE:=atomic}
 
+echo "test"
+
 if [ "${PUSH_TYPE}" == "atomic" ]; then
 
   IMAGE_SIGNATURE_EXISTS=$(oc get images ${IMAGE_DIGEST} -o json | jq -r 'has("signatures")')
@@ -18,12 +20,20 @@ if [ "${PUSH_TYPE}" == "atomic" ]; then
 
 fi
 
+echo "1"
 SA_FULLNAME=$(oc whoami)
+echo "2"
 SA_NAME="${SA_FULLNAME##*:}"
+echo "3"
 NAMESPACE=$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace)
+echo "4"
 SA_JSON=$(oc get sa -n $NAMESPACE $SA_NAME -o json)
+echo "5"
 DOCKERCFG_SECRET_NAME=$(echo "${SA_JSON}" | jq -r ".imagePullSecrets[] | select( .name | contains(\"${SA_NAME}-dockercfg\")).name")
+echo "6"
 DOCKERCFG=$(oc get secret -n $NAMESPACE $DOCKERCFG_SECRET_NAME -o json | jq -r ".data[] | select(\".dockercfg\")" | base64 -d)
+echo "7"
+
 
 if [ -z ${IMAGE} ]; then
   echo "No Image Specified for Signing"
