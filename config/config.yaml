@@ -1,3 +1,0 @@
-apiVersion: cop.redhat.com/v1alpha2
-kind: ImageSigningRequest
-projectName: image-scanning-signing-service
