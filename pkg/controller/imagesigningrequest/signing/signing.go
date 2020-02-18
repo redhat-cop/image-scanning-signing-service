@@ -1,10 +1,10 @@
 package signing
 
 import (
+	"context"
 	"os"
 
-	"github.com/operator-framework/operator-sdk/pkg/sdk"
-	"github.com/redhat-cop/image-security/pkg/apis/imagesigningrequest/v1alpha1"
+	"github.com/redhat-cop/image-security/pkg/apis/imagesigningrequests/v1alpha1"
 	"github.com/redhat-cop/image-security/pkg/controller/config"
 	"github.com/redhat-cop/image-security/pkg/controller/util"
 	"github.com/sirupsen/logrus"
@@ -63,7 +63,7 @@ func updateImageSigningRequest(imageSigningRequest *v1alpha1.ImageSigningRequest
 	imageSigningRequest.Status.Conditions = append(imageSigningRequest.Status.Conditions, condition)
 	imageSigningRequest.Status.Phase = phase
 
-	err := sdk.Update(imageSigningRequest)
+	err := r.client.Update(context.TODO(), imageScanningRequest)
 
 	return err
 }
@@ -77,7 +77,7 @@ func LaunchSigningPod(config config.Config, image string, imageDigest string, ow
 		return "", err
 	}
 
-	err = sdk.Create(pod)
+	err := r.client.Create(context.TODO(), pod)
 
 	if err != nil {
 		logrus.Errorf("Error Creating Pod: %v'", err)

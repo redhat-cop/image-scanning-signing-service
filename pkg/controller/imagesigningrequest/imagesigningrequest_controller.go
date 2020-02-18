@@ -7,11 +7,12 @@ import (
 
 	imagev1 "github.com/openshift/api/image/v1"
 	"github.com/redhat-cop/image-scanning-signing-service/pkg/common"
-	"github.com/redhat-cop/image-scanning-signing-service/pkg/util"
 	imagesigningrequestsv1alpha1 "github.com/redhat-cop/image-security/pkg/apis/imagesigningrequests/v1alpha1"
+	"github.com/redhat-cop/image-security/pkg/controller/common"
 	"github.com/redhat-cop/image-security/pkg/controller/config"
 	"github.com/redhat-cop/image-security/pkg/controller/images"
 	"github.com/redhat-cop/image-security/pkg/controller/imagesigningrequest/signing"
+	"github.com/redhat-cop/image-security/pkg/controller/util"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"

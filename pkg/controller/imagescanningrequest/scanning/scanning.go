@@ -1,7 +1,8 @@
 package scanning
 
 import (
-	"github.com/operator-framework/operator-sdk/pkg/sdk"
+	"context"
+
 	"github.com/redhat-cop/image-security/pkg/apis/imagescanningrequests/v1alpha1"
 	"github.com/redhat-cop/image-security/pkg/controller/config"
 	"github.com/redhat-cop/image-security/pkg/controller/util"
@@ -41,7 +42,7 @@ func updateImageScanningRequest(imageScanningRequest *v1alpha1.ImageScanningRequ
 	imageScanningRequest.Status.Conditions = append(imageScanningRequest.Status.Conditions, condition)
 	imageScanningRequest.Status.Phase = phase
 
-	err := sdk.Update(imageScanningRequest)
+	err := r.client.Update(context.TODO(), imageScanningRequest)
 
 	return err
 }
@@ -81,7 +82,7 @@ func LaunchScanningPod(config config.Config, image string, ownerID string, owner
 		logrus.Errorf("Error Generating Pod: %v'", err)
 		return "", err
 	}
-	err = sdk.Create(pod)
+	err := r.client.Create(context.TODO(), pod)
 
 	if err != nil {
 		logrus.Errorf("Error Creating Pod: %v'", err)
@@ -172,6 +173,6 @@ func DeleteScanningPod(name string, namespace string) error {
 		},
 	}
 
-	return sdk.Delete(pod)
+	return r.client.Delete(context.TODO(), pod)
 
 }

@@ -4,7 +4,7 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/redhat-cop/image-scanning-signing-service/pkg/apis/cop/v1alpha1"
+	"github.com/redhat-cop/image-security/pkg/apis/imagescanningrequests/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
