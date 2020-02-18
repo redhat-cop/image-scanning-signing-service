@@ -1,24 +1,22 @@
 package v1alpha1
 
 import (
+	images "github.com/redhat-cop/image-security/pkg/controller/images"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-
-// ImageSigningRequestSpec defines the desired state of ImageSigningRequest
 type ImageSigningRequestSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "operator-sdk generate k8s" to regenerate code after modifying this file
-	// Add custom validation using kubebuilder tags: https://book-v1.book.kubebuilder.io/beyond_basics/generating_crd.html
+	ImageStreamTag       string `json:"imageStreamTag"`
+	SigningKeySecretName string `json:"signingKeySecretName,omitempty"`
+	SigningKeySignBy     string `json:"signingKeySignBy,omitempty"`
 }
-
-// ImageSigningRequestStatus defines the observed state of ImageSigningRequest
 type ImageSigningRequestStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "operator-sdk generate k8s" to regenerate code after modifying this file
-	// Add custom validation using kubebuilder tags: https://book-v1.book.kubebuilder.io/beyond_basics/generating_crd.html
+	Conditions    []images.ImageExecutionCondition `json:"conditions,omitempty"`
+	Phase         images.ImageExecutionPhase       `json:"phase,omitempty"`
+	SignedImage   string                           `json:"signedImage,omitempty"`
+	UnsignedImage string                           `json:"unsignedImage,omitempty"`
+	StartTime     metav1.Time                      `json:"startTime,omitempty"`
+	EndTime       metav1.Time                      `json:"endTime,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

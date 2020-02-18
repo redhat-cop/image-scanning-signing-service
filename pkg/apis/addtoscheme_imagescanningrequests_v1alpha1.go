@@ -1,7 +1,7 @@
 package apis
 
 import (
-	"github.com/redhat-cop/image-scanning-signing-service/image-security/pkg/apis/imagescanningrequests/v1alpha1"
+	"github.com/redhat-cop/image-security/pkg/apis/imagescanningrequests/v1alpha1"
 )
 
 func init() {

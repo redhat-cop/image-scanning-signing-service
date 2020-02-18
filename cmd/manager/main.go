@@ -8,12 +8,12 @@ import (
 	"runtime"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
-	_ "k8s.io/client-go/plugin/pkg/client/auth"
+	_"k8s.io/client-go/plugin/pkg/client/auth"
 	"k8s.io/client-go/rest"
 
-	"github.com/redhat-cop/image-scanning-signing-service/image-security/pkg/apis"
-	"github.com/redhat-cop/image-scanning-signing-service/image-security/pkg/controller"
-	"github.com/redhat-cop/image-scanning-signing-service/image-security/version"
+	"github.com/redhat-cop/image-security/pkg/apis"
+	"github.com/redhat-cop/mage-security/pkg/controller"
+	"github.com/redhat-cop/image-security/version"
 
 	"github.com/operator-framework/operator-sdk/pkg/k8sutil"
 	kubemetrics "github.com/operator-framework/operator-sdk/pkg/kube-metrics"

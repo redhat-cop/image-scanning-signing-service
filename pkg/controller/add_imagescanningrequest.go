@@ -1,7 +1,7 @@
 package controller
 
 import (
-	"github.com/redhat-cop/image-scanning-signing-service/image-security/pkg/controller/imagescanningrequest"
+	"github.com/redhat-cop/image-security/pkg/controller/imagescanningrequest"
 )
 
 func init() {

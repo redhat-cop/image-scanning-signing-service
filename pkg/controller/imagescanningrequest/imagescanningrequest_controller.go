@@ -2,16 +2,30 @@ package imagescanningrequest
 
 import (
 	"context"
+	"encoding/xml"
+	"fmt"
+	"net/http"
+	"time"
 
-	imagescanningrequestsv1alpha1 "github.com/redhat-cop/image-scanning-signing-service/image-security/pkg/apis/imagescanningrequests/v1alpha1"
+	imagev1 "github.com/openshift/api/image/v1"
+	"github.com/redhat-cop/image-scanning-signing-service/pkg/common"
+	imagescanningrequestsv1alpha1 "github.com/redhat-cop/image-security/pkg/apis/imagescanningrequests/v1alpha1"
+	"github.com/redhat-cop/image-security/pkg/controller/config"
+	"github.com/redhat-cop/image-security/pkg/controller/images"
+	"github.com/redhat-cop/image-security/pkg/controller/imagescanningrequest/openscap"
+	"github.com/redhat-cop/image-security/pkg/controller/imagescanningrequest/scanning"
+	"github.com/redhat-cop/image-security/pkg/controller/util"
+	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -29,12 +43,19 @@ var log = logf.Log.WithName("controller_imagescanningrequest")
 // Add creates a new ImageScanningRequest Controller and adds it to the Manager. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
 func Add(mgr manager.Manager) error {
-	return add(mgr, newReconciler(mgr))
+	k8sclient, err := kubernetes.NewForConfig(mgr.GetConfig())
+
+	if err != nil {
+		return err
+	}
+
+	return add(mgr, newReconciler(mgr, k8sclient))
 }
 
 // newReconciler returns a new reconcile.Reconciler
-func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	return &ReconcileImageScanningRequest{client: mgr.GetClient(), scheme: mgr.GetScheme()}
+func newReconciler(mgr manager.Manager, k8sclient kubernetes.Interface) reconcile.Reconciler {
+	configuration := config.LoadConfig()
+	return &ReconcileImageScanningRequest{client: mgr.GetClient(), scheme: mgr.GetScheme(), config: configuration}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -71,8 +92,10 @@ var _ reconcile.Reconciler = &ReconcileImageScanningRequest{}
 type ReconcileImageScanningRequest struct {
 	// This client, initialized using mgr.Client() above, is a split client
 	// that reads objects from the cache and writes to the apiserver
-	client client.Client
-	scheme *runtime.Scheme
+	client    client.Client
+	scheme    *runtime.Scheme
+	config    config.Config
+	k8sclient kubernetes.Interface
 }
 
 // Reconcile reads that state of the cluster for a ImageScanningRequest object and makes changes based on the state read
@@ -92,62 +115,241 @@ func (r *ReconcileImageScanningRequest) Reconcile(request reconcile.Request) (re
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Request object not found, could have been deleted after reconcile request.
-			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
-			// Return and don't requeue
 			return reconcile.Result{}, nil
 		}
 		// Error reading the object - requeue the request.
 		return reconcile.Result{}, err
 	}
 
-	// Define a new Pod object
-	pod := newPodForCR(instance)
+	imageScanningRequestMetadataKey, _ := cache.MetaNamespaceKeyFunc(instance)
 
-	// Set ImageScanningRequest instance as the owner and controller
-	if err := controllerutil.SetControllerReference(instance, pod, r.scheme); err != nil {
-		return reconcile.Result{}, err
-	}
+	emptyPhase := imagescanningrequestsv1alpha1.ImageScanningRequestStatus{}.Phase
+	if instance.Status.Phase == emptyPhase {
+		_, requestIsTag := util.ParseImageStreamTag(instance.Spec.ImageStreamTag)
 
-	// Check if this Pod already exists
-	found := &corev1.Pod{}
-	err = r.client.Get(context.TODO(), types.NamespacedName{Name: pod.Name, Namespace: pod.Namespace}, found)
-	if err != nil && errors.IsNotFound(err) {
-		reqLogger.Info("Creating a new Pod", "Pod.Namespace", pod.Namespace, "Pod.Name", pod.Name)
-		err = r.client.Create(context.TODO(), pod)
+		requestImageStreamTag := &imagev1.ImageStreamTag{}
+		err := r.client.Get(context.TODO(), types.NamespacedName{Name: instance.Spec.ImageStreamTag, Namespace: instance.ObjectMeta.Namespace}, requestImageStreamTag)
+
+		if err != nil {
+
+			errorMessage := ""
+
+			if k8serrors.IsNotFound(err) {
+				errorMessage = fmt.Sprintf("ImageStreamTag %s Not Found in Namespace %s", instance.Spec.ImageStreamTag, instance.Namespace)
+			} else {
+				errorMessage = fmt.Sprintf("Error retrieving ImageStreamTag: %v", err)
+			}
+
+			logrus.Warnf(errorMessage)
+			err = scanning.UpdateOnImageScanningInitializationFailure(errorMessage, *instance)
+
+			if err != nil {
+				return reconcile.Result{}, err
+			}
+
+			return reconcile.Result{}, nil
+
+		}
+
+		dockerImageRegistry, dockerImageID, err := util.ExtractImageIDFromImageReference(requestImageStreamTag.Image.DockerImageReference)
+
 		if err != nil {
 			return reconcile.Result{}, err
 		}
 
-		// Pod created successfully - don't requeue
+		scanningPodName, err := scanning.LaunchScanningPod(r.config, fmt.Sprintf("%s:%s", dockerImageRegistry, requestIsTag), string(instance.ObjectMeta.UID), imageScanningRequestMetadataKey)
+
+		if err != nil {
+			errorMessage := fmt.Sprintf("Error Occurred Creating Scanning Pod '%v'", err)
+
+			logrus.Errorf(errorMessage)
+
+			err = scanning.UpdateOnImageScanningInitializationFailure(errorMessage, *instance)
+
+			if err != nil {
+				return reconcile.Result{}, err
+			}
+
+			return reconcile.Result{}, nil
+		}
+
+		logrus.Infof("Scanning Pod Launched '%s'", scanningPodName)
+
+		err = scanning.UpdateOnScanningPodLaunch(fmt.Sprintf("Scanning Pod Launched '%s'", scanningPodName), dockerImageID, *instance)
+
+		if err != nil {
+			return reconcile.Result{}, err
+		}
+
 		return reconcile.Result{}, nil
-	} else if err != nil {
-		return reconcile.Result{}, err
-	}
 
-	// Pod already exists - don't requeue
-	reqLogger.Info("Skip reconcile: Pod already exists", "Pod.Namespace", found.Namespace, "Pod.Name", found.Name)
+		// Not an empty phase so check the status of the runnning scanning pods
+	} else {
+
+		pod := &corev1.Pod{}
+		err := r.client.Get(context.TODO(), request.NamespacedName, instance)
+		podOwnerAnnotation := pod.Annotations[common.CopOwnerAnnotation]
+		podMetadataKey, _ := cache.MetaNamespaceKeyFunc(pod)
+
+		podNamespace, podName, _ := cache.SplitMetaNamespaceKey(podMetadataKey)
+
+		// Defensive mechanisms
+		if pod.ObjectMeta.GetAnnotations() == nil || pod.ObjectMeta.GetAnnotations()[common.CopOwnerAnnotation] == "" || pod.ObjectMeta.GetAnnotations()[common.CopTypeAnnotation] == "" {
+			return reconcile.Result{}, nil
+		}
+
+		// Check if ImageScanningRequest has already been marked as Succeeded or Failed
+		if instance.Status.Phase == images.PhaseCompleted || instance.Status.Phase == images.PhaseFailed {
+			return reconcile.Result{}, nil
+		}
+
+		// Check to verfiy ImageSigningRequest is in phase Running
+		if instance.Status.Phase != images.PhaseRunning {
+			return reconcile.Result{}, nil
+		}
+
+		// Check if Failed
+		if pod.Status.Phase == corev1.PodFailed {
+			logrus.Infof("Scanning Pod Failed. Updating ImageSiginingRequest %s", podOwnerAnnotation)
+
+			err = scanning.UpdateOnImageScanningCompletionError(fmt.Sprintf("Scanning Pod Failed '%v'", err), *instance)
+
+			if err != nil {
+				return reconcile.Result{}, err
+			}
+
+			return reconcile.Result{}, nil
+
+		} else if pod.Status.Phase == corev1.PodRunning {
+			logrus.Infof("Scanning Pod '%s' in Namespace '%s' is Running. Waiting for Scan to Complete...", podName, podNamespace)
+
+			var delay = time.Duration(10) * time.Second
+			attempts := 20
+
+			c1 := make(chan bool)
+
+			go func() {
+
+				for i := 1; i <= attempts; i++ {
+
+					healthRequest := r.k8sclient.CoreV1().RESTClient().Get().
+						Namespace(podNamespace).
+						Resource("pods").
+						SubResource("proxy").
+						Name(net.JoinSchemeNamePort("http", podName, "8080")).
+						Suffix("healthz")
+
+					result := healthRequest.Do()
+					var statusCode int
+					result.StatusCode(&statusCode)
+
+					if http.StatusOK == statusCode {
+						c1 <- true
+						return
+					}
+					time.Sleep(delay)
+				}
+
+				c1 <- false
+			}()
+
+			podHealthy := <-c1
+
+			if podHealthy {
+
+				logrus.Infoln("Retrieving OpenSCAP Report")
+
+				openSCAPReportResult := r.k8sclient.CoreV1().RESTClient().Get().
+					Namespace(podNamespace).
+					Resource("pods").
+					SubResource("proxy").
+					Name(net.JoinSchemeNamePort("http", podName, "8080")).
+					Suffix("/api/v1/openscap").Do()
+
+				failedRules, passedRules, totalRules := 0, 0, 0
+
+				var openSCAPReport openscap.OpenSCAPReport
+
+				resp, err := openSCAPReportResult.Raw()
+
+				if err != nil {
+					logrus.Errorf("Failed to Retrieve OpenScap Report %v", err)
+
+					err = scanning.UpdateOnImageScanningCompletionError("OpenSCAP Report Retrieval Failure", *instance)
+
+					if err != nil {
+						return reconcile.Result{}, err
+					}
+
+					return reconcile.Result{}, nil
+				}
+
+				err = xml.Unmarshal(resp, &openSCAPReport)
+
+				if err != nil {
+					logrus.Errorf("Failed Unmarshalling OpenSCAP Report %v", err)
+
+					err = scanning.UpdateOnImageScanningCompletionError("Failed Unmarshalling OpenSCAP Report", *instance)
+
+					if err != nil {
+						return reconcile.Result{}, err
+					}
+
+					return reconcile.Result{}, nil
+				}
+
+				for i := 0; i < len(openSCAPReport.Reports); i++ {
+					for j := 0; j < len(openSCAPReport.Reports[i].Report[i].Content.TestResult.RuleResults); j++ {
+						result := openSCAPReport.Reports[i].Report[i].Content.TestResult.RuleResults[j].Result
+
+						if result == "pass" {
+							passedRules++
+
+						} else if result == "fail" {
+							failedRules++
+						}
+
+						totalRules++
+
+					}
+				}
+
+				logrus.Infof("Scanning Pod Succeeded. Updating ImageScanningRequest %s", pod.Annotations[common.CopOwnerAnnotation])
+
+				err = scanning.UpdateOnImageScanningCompletionSuccess("Image Scanned", totalRules, passedRules, failedRules, *instance)
+
+				if err != nil {
+					return reconcile.Result{}, err
+				}
+
+				// Best Effort Delete Scanning Pod
+				err = scanning.DeleteScanningPod(podName, podNamespace)
+
+				if err != nil {
+					logrus.Warnf("Failed to Delete Scanning Pod '%s': %v", podName, err)
+				}
+
+			} else {
+				logrus.Infof("Scanning Health Check Could Not Be Validated. Updating ImageScanningRequest %s", podOwnerAnnotation)
+
+				err = scanning.UpdateOnImageScanningCompletionError("Health Check Validation Error", *instance)
+
+				if err != nil {
+					return reconcile.Result{}, err
+				}
+
+				// Best Effort Delete Scanning Pod
+				err = scanning.DeleteScanningPod(podName, podNamespace)
+
+				if err != nil {
+					logrus.Warnf("Failed to Delete Scanning Pod '%s': %v", podName, err)
+				}
+
+				return reconcile.Result{}, nil
+
+			}
+
+		}
+	}
 	return reconcile.Result{}, nil
-}
-
-// newPodForCR returns a busybox pod with the same name/namespace as the cr
-func newPodForCR(cr *imagescanningrequestsv1alpha1.ImageScanningRequest) *corev1.Pod {
-	labels := map[string]string{
-		"app": cr.Name,
-	}
-	return &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      cr.Name + "-pod",
-			Namespace: cr.Namespace,
-			Labels:    labels,
-		},
-		Spec: corev1.PodSpec{
-			Containers: []corev1.Container{
-				{
-					Name:    "busybox",
-					Image:   "busybox",
-					Command: []string{"sleep", "3600"},
-				},
-			},
-		},
-	}
 }
