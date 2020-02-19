@@ -6,7 +6,6 @@ import (
 	"os"
 
 	imagev1 "github.com/openshift/api/image/v1"
-	"github.com/redhat-cop/image-scanning-signing-service/pkg/common"
 	imagesigningrequestsv1alpha1 "github.com/redhat-cop/image-security/pkg/apis/imagesigningrequests/v1alpha1"
 	"github.com/redhat-cop/image-security/pkg/controller/common"
 	"github.com/redhat-cop/image-security/pkg/controller/config"
@@ -121,7 +120,7 @@ func (r *ReconcileImageSigningRequest) Reconcile(request reconcile.Request) (rec
 			}
 
 			logrus.Warnf(errorMessage)
-			err = signing.UpdateOnImageSigningInitializationFailure(errorMessage, *instance)
+			err = signing.UpdateOnImageSigningInitializationFailure(r.client, errorMessage, *instance)
 
 			if err != nil {
 				return reconcile.Result{}, err
@@ -142,7 +141,7 @@ func (r *ReconcileImageSigningRequest) Reconcile(request reconcile.Request) (rec
 
 			logrus.Warnf(errorMessage)
 
-			err = signing.UpdateOnImageSigningInitializationFailure(errorMessage, *instance)
+			err = signing.UpdateOnImageSigningInitializationFailure(r.client, errorMessage, *instance)
 
 			if err != nil {
 				return reconcile.Result{}, err
@@ -167,7 +166,7 @@ func (r *ReconcileImageSigningRequest) Reconcile(request reconcile.Request) (rec
 
 					errorMessage := fmt.Sprintf("GPG Secret '%s' Not Found in Namespace '%s'", instance.Spec.SigningKeySecretName, instance.Namespace)
 					logrus.Warnf(errorMessage)
-					err = signing.UpdateOnImageSigningInitializationFailure(errorMessage, *instance)
+					err = signing.UpdateOnImageSigningInitializationFailure(r.client, errorMessage, *instance)
 
 					if err != nil {
 						return reconcile.Result{}, err
@@ -200,14 +199,14 @@ func (r *ReconcileImageSigningRequest) Reconcile(request reconcile.Request) (rec
 
 			}
 
-			signingPodName, err := signing.LaunchSigningPod(r.config, fmt.Sprintf("%s:%s", dockerImageRegistry, requestIsTag), dockerImageID, string(instance.ObjectMeta.UID), imageSigningRequestMetadataKey, gpgSecretName, gpgSignBy)
+			signingPodName, err := signing.LaunchSigningPod(r.client, r.config, fmt.Sprintf("%s:%s", dockerImageRegistry, requestIsTag), dockerImageID, string(instance.ObjectMeta.UID), imageSigningRequestMetadataKey, gpgSecretName, gpgSignBy)
 
 			if err != nil {
 				errorMessage := fmt.Sprintf("Error Occurred Creating Signing Pod '%v'", err)
 
 				logrus.Errorf(errorMessage)
 
-				err = signing.UpdateOnImageSigningInitializationFailure(errorMessage, *instance)
+				err = signing.UpdateOnImageSigningInitializationFailure(r.client, errorMessage, *instance)
 
 				if err != nil {
 					return reconcile.Result{}, err
@@ -218,7 +217,7 @@ func (r *ReconcileImageSigningRequest) Reconcile(request reconcile.Request) (rec
 
 			logrus.Infof("Signing Pod Launched '%s'", signingPodName)
 
-			err = signing.UpdateOnSigningPodLaunch(fmt.Sprintf("Signing Pod Launched '%s'", signingPodName), dockerImageID, *instance)
+			err = signing.UpdateOnSigningPodLaunch(r.client, fmt.Sprintf("Signing Pod Launched '%s'", signingPodName), dockerImageID, *instance)
 
 			if err != nil {
 				return reconcile.Result{}, err
@@ -253,7 +252,7 @@ func (r *ReconcileImageSigningRequest) Reconcile(request reconcile.Request) (rec
 		if pod.Status.Phase == corev1.PodFailed {
 			logrus.Infof("Signing Pod Failed. Updating ImageSiginingRequest %s", podOwnerAnnotation)
 
-			err = signing.UpdateOnImageSigningCompletionError(fmt.Sprintf("Signing Pod Failed '%v'", err), *instance)
+			err = signing.UpdateOnImageSigningCompletionError(r.client, fmt.Sprintf("Signing Pod Failed '%v'", err), *instance)
 
 			if err != nil {
 				return reconcile.Result{}, err
@@ -271,7 +270,7 @@ func (r *ReconcileImageSigningRequest) Reconcile(request reconcile.Request) (rec
 				errorMessage := fmt.Sprintf("ImageStream %s Not Found in Namespace %s", instance.Spec.ImageStreamTag, instance.Namespace)
 				logrus.Warnf(errorMessage)
 
-				err = signing.UpdateOnImageSigningCompletionError(errorMessage, *instance)
+				err = signing.UpdateOnImageSigningCompletionError(r.client, errorMessage, *instance)
 
 				if err != nil {
 					return reconcile.Result{}, err
@@ -294,14 +293,14 @@ func (r *ReconcileImageSigningRequest) Reconcile(request reconcile.Request) (rec
 
 				logrus.Infof("Signing Pod Succeeded. Updating ImageSiginingRequest %s", pod.Annotations[common.CopOwnerAnnotation])
 
-				err = signing.UpdateOnImageSigningCompletionSuccess("Image Signed", dockerImageID, *instance)
+				err = signing.UpdateOnImageSigningCompletionSuccess(r.client, "Image Signed", dockerImageID, *instance)
 
 				if err != nil {
 					return reconcile.Result{}, err
 				}
 
 			} else {
-				err = signing.UpdateOnImageSigningCompletionError(fmt.Sprintf("No Signature Exists on Image '%s' After Signing Completed", dockerImageID), *instance)
+				err = signing.UpdateOnImageSigningCompletionError(r.client, fmt.Sprintf("No Signature Exists on Image '%s' After Signing Completed", dockerImageID), *instance)
 
 				if err != nil {
 					return reconcile.Result{}, err

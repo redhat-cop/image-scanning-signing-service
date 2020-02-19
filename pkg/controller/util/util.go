@@ -4,16 +4,16 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/redhat-cop/image-security/pkg/apis/imagescanningrequests/v1alpha1"
+	"github.com/redhat-cop/image-security/pkg/controller/images"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	imagev1 "github.com/openshift/api/image/v1"
 )
 
-func NewImageExecutionCondition(message string, conditionStatus corev1.ConditionStatus, conditionType v1alpha1.ImageExecutionConditionType) v1alpha1.ImageExecutionCondition {
+func NewImageExecutionCondition(message string, conditionStatus corev1.ConditionStatus, conditionType images.ImageExecutionConditionType) images.ImageExecutionCondition {
 
-	return v1alpha1.ImageExecutionCondition{
+	return images.ImageExecutionCondition{
 		LastTransitionTime: metav1.Now(),
 		Message:            message,
 		Status:             conditionStatus,

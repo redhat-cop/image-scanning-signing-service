@@ -141,7 +141,7 @@ func (r *ReconcileImageScanningRequest) Reconcile(request reconcile.Request) (re
 			}
 
 			logrus.Warnf(errorMessage)
-			err = scanning.UpdateOnImageScanningInitializationFailure(errorMessage, *instance)
+			err = scanning.UpdateOnImageScanningInitializationFailure(r.client, errorMessage, *instance)
 
 			if err != nil {
 				return reconcile.Result{}, err
@@ -157,14 +157,14 @@ func (r *ReconcileImageScanningRequest) Reconcile(request reconcile.Request) (re
 			return reconcile.Result{}, err
 		}
 
-		scanningPodName, err := scanning.LaunchScanningPod(r.config, fmt.Sprintf("%s:%s", dockerImageRegistry, requestIsTag), string(instance.ObjectMeta.UID), imageScanningRequestMetadataKey)
+		scanningPodName, err := scanning.LaunchScanningPod(r.client, r.config, fmt.Sprintf("%s:%s", dockerImageRegistry, requestIsTag), string(instance.ObjectMeta.UID), imageScanningRequestMetadataKey)
 
 		if err != nil {
 			errorMessage := fmt.Sprintf("Error Occurred Creating Scanning Pod '%v'", err)
 
 			logrus.Errorf(errorMessage)
 
-			err = scanning.UpdateOnImageScanningInitializationFailure(errorMessage, *instance)
+			err = scanning.UpdateOnImageScanningInitializationFailure(r.client, errorMessage, *instance)
 
 			if err != nil {
 				return reconcile.Result{}, err
@@ -175,7 +175,7 @@ func (r *ReconcileImageScanningRequest) Reconcile(request reconcile.Request) (re
 
 		logrus.Infof("Scanning Pod Launched '%s'", scanningPodName)
 
-		err = scanning.UpdateOnScanningPodLaunch(fmt.Sprintf("Scanning Pod Launched '%s'", scanningPodName), dockerImageID, *instance)
+		err = scanning.UpdateOnScanningPodLaunch(r.client, fmt.Sprintf("Scanning Pod Launched '%s'", scanningPodName), dockerImageID, *instance)
 
 		if err != nil {
 			return reconcile.Result{}, err
@@ -212,7 +212,7 @@ func (r *ReconcileImageScanningRequest) Reconcile(request reconcile.Request) (re
 		if pod.Status.Phase == corev1.PodFailed {
 			logrus.Infof("Scanning Pod Failed. Updating ImageSiginingRequest %s", podOwnerAnnotation)
 
-			err = scanning.UpdateOnImageScanningCompletionError(fmt.Sprintf("Scanning Pod Failed '%v'", err), *instance)
+			err = scanning.UpdateOnImageScanningCompletionError(r.client, fmt.Sprintf("Scanning Pod Failed '%v'", err), *instance)
 
 			if err != nil {
 				return reconcile.Result{}, err
@@ -275,7 +275,7 @@ func (r *ReconcileImageScanningRequest) Reconcile(request reconcile.Request) (re
 				if err != nil {
 					logrus.Errorf("Failed to Retrieve OpenScap Report %v", err)
 
-					err = scanning.UpdateOnImageScanningCompletionError("OpenSCAP Report Retrieval Failure", *instance)
+					err = scanning.UpdateOnImageScanningCompletionError(r.client, "OpenSCAP Report Retrieval Failure", *instance)
 
 					if err != nil {
 						return reconcile.Result{}, err
@@ -289,7 +289,7 @@ func (r *ReconcileImageScanningRequest) Reconcile(request reconcile.Request) (re
 				if err != nil {
 					logrus.Errorf("Failed Unmarshalling OpenSCAP Report %v", err)
 
-					err = scanning.UpdateOnImageScanningCompletionError("Failed Unmarshalling OpenSCAP Report", *instance)
+					err = scanning.UpdateOnImageScanningCompletionError(r.client, "Failed Unmarshalling OpenSCAP Report", *instance)
 
 					if err != nil {
 						return reconcile.Result{}, err
@@ -316,14 +316,14 @@ func (r *ReconcileImageScanningRequest) Reconcile(request reconcile.Request) (re
 
 				logrus.Infof("Scanning Pod Succeeded. Updating ImageScanningRequest %s", pod.Annotations[common.CopOwnerAnnotation])
 
-				err = scanning.UpdateOnImageScanningCompletionSuccess("Image Scanned", totalRules, passedRules, failedRules, *instance)
+				err = scanning.UpdateOnImageScanningCompletionSuccess(r.client, "Image Scanned", totalRules, passedRules, failedRules, *instance)
 
 				if err != nil {
 					return reconcile.Result{}, err
 				}
 
 				// Best Effort Delete Scanning Pod
-				err = scanning.DeleteScanningPod(podName, podNamespace)
+				err = scanning.DeleteScanningPod(r.client, podName, podNamespace)
 
 				if err != nil {
 					logrus.Warnf("Failed to Delete Scanning Pod '%s': %v", podName, err)
@@ -332,14 +332,14 @@ func (r *ReconcileImageScanningRequest) Reconcile(request reconcile.Request) (re
 			} else {
 				logrus.Infof("Scanning Health Check Could Not Be Validated. Updating ImageScanningRequest %s", podOwnerAnnotation)
 
-				err = scanning.UpdateOnImageScanningCompletionError("Health Check Validation Error", *instance)
+				err = scanning.UpdateOnImageScanningCompletionError(r.client, "Health Check Validation Error", *instance)
 
 				if err != nil {
 					return reconcile.Result{}, err
 				}
 
 				// Best Effort Delete Scanning Pod
-				err = scanning.DeleteScanningPod(podName, podNamespace)
+				err = scanning.DeleteScanningPod(r.client, podName, podNamespace)
 
 				if err != nil {
 					logrus.Warnf("Failed to Delete Scanning Pod '%s': %v", podName, err)

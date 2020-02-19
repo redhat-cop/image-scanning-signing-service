@@ -6,69 +6,71 @@ import (
 
 	"github.com/redhat-cop/image-security/pkg/apis/imagesigningrequests/v1alpha1"
 	"github.com/redhat-cop/image-security/pkg/controller/config"
+	"github.com/redhat-cop/image-security/pkg/controller/images"
 	"github.com/redhat-cop/image-security/pkg/controller/util"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/cache"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	corev1 "k8s.io/api/core/v1"
 )
 
-func UpdateOnImageSigningCompletionError(message string, imageSigningRequest v1alpha1.ImageSigningRequest) error {
+func UpdateOnImageSigningCompletionError(client client.Client, message string, imageSigningRequest v1alpha1.ImageSigningRequest) error {
 	imageSigningRequestCopy := imageSigningRequest.DeepCopy()
 
-	condition := util.NewImageExecutionCondition(message, corev1.ConditionFalse, v1alpha1.ImageExecutionConditionFinished)
+	condition := util.NewImageExecutionCondition(message, corev1.ConditionFalse, images.ImageExecutionConditionFinished)
 
 	imageSigningRequestCopy.Status.EndTime = condition.LastTransitionTime
 
-	return updateImageSigningRequest(imageSigningRequestCopy, condition, v1alpha1.PhaseFailed)
+	return updateImageSigningRequest(client, imageSigningRequestCopy, condition, images.PhaseFailed)
 }
 
-func UpdateOnImageSigningCompletionSuccess(message string, signedImage string, imageSigningRequest v1alpha1.ImageSigningRequest) error {
+func UpdateOnImageSigningCompletionSuccess(client client.Client, message string, signedImage string, imageSigningRequest v1alpha1.ImageSigningRequest) error {
 	imageSigningRequestCopy := imageSigningRequest.DeepCopy()
 
-	condition := util.NewImageExecutionCondition(message, corev1.ConditionTrue, v1alpha1.ImageExecutionConditionFinished)
+	condition := util.NewImageExecutionCondition(message, corev1.ConditionTrue, images.ImageExecutionConditionFinished)
 
 	imageSigningRequestCopy.Status.SignedImage = signedImage
 	imageSigningRequestCopy.Status.EndTime = condition.LastTransitionTime
 
-	return updateImageSigningRequest(imageSigningRequestCopy, condition, v1alpha1.PhaseCompleted)
+	return updateImageSigningRequest(client, imageSigningRequestCopy, condition, images.PhaseCompleted)
 }
 
-func UpdateOnImageSigningInitializationFailure(message string, imageSigningRequest v1alpha1.ImageSigningRequest) error {
+func UpdateOnImageSigningInitializationFailure(client client.Client, message string, imageSigningRequest v1alpha1.ImageSigningRequest) error {
 	imageSigningRequestCopy := imageSigningRequest.DeepCopy()
 
-	condition := util.NewImageExecutionCondition(message, corev1.ConditionFalse, v1alpha1.ImageExecutionConditionInitialization)
+	condition := util.NewImageExecutionCondition(message, corev1.ConditionFalse, images.ImageExecutionConditionInitialization)
 
 	imageSigningRequestCopy.Status.StartTime = condition.LastTransitionTime
 	imageSigningRequestCopy.Status.EndTime = condition.LastTransitionTime
 
-	return updateImageSigningRequest(imageSigningRequestCopy, condition, v1alpha1.PhaseFailed)
+	return updateImageSigningRequest(client, imageSigningRequestCopy, condition, images.PhaseFailed)
 }
 
-func UpdateOnSigningPodLaunch(message string, unsignedImage string, imageSigningRequest v1alpha1.ImageSigningRequest) error {
+func UpdateOnSigningPodLaunch(client client.Client, message string, unsignedImage string, imageSigningRequest v1alpha1.ImageSigningRequest) error {
 	imageSigningRequestCopy := imageSigningRequest.DeepCopy()
 
-	condition := util.NewImageExecutionCondition(message, corev1.ConditionTrue, v1alpha1.ImageExecutionConditionInitialization)
+	condition := util.NewImageExecutionCondition(message, corev1.ConditionTrue, images.ImageExecutionConditionInitialization)
 
 	imageSigningRequestCopy.Status.UnsignedImage = unsignedImage
 	imageSigningRequestCopy.Status.StartTime = condition.LastTransitionTime
 
-	return updateImageSigningRequest(imageSigningRequestCopy, condition, v1alpha1.PhaseRunning)
+	return updateImageSigningRequest(client, imageSigningRequestCopy, condition, images.PhaseRunning)
 }
 
-func updateImageSigningRequest(imageSigningRequest *v1alpha1.ImageSigningRequest, condition v1alpha1.ImageExecutionCondition, phase v1alpha1.ImageExecutionPhase) error {
+func updateImageSigningRequest(client client.Client, imageSigningRequest *v1alpha1.ImageSigningRequest, condition images.ImageExecutionCondition, phase images.ImageExecutionPhase) error {
 
 	imageSigningRequest.Status.Conditions = append(imageSigningRequest.Status.Conditions, condition)
 	imageSigningRequest.Status.Phase = phase
 
-	err := r.client.Update(context.TODO(), imageScanningRequest)
+	err := client.Update(context.TODO(), imageSigningRequest)
 
 	return err
 }
 
-func LaunchSigningPod(config config.Config, image string, imageDigest string, ownerID string, ownerReference string, gpgSecretName string, gpgSignBy string) (string, error) {
+func LaunchSigningPod(client client.Client, config config.Config, image string, imageDigest string, ownerID string, ownerReference string, gpgSecretName string, gpgSignBy string) (string, error) {
 
 	pod, err := createSigningPod(config.SignScanImage, config.TargetProject, image, imageDigest, ownerID, ownerReference, config.TargetServiceAccount, gpgSecretName, gpgSignBy)
 
@@ -77,7 +79,7 @@ func LaunchSigningPod(config config.Config, image string, imageDigest string, ow
 		return "", err
 	}
 
-	err := r.client.Create(context.TODO(), pod)
+	err = client.Create(context.TODO(), pod)
 
 	if err != nil {
 		logrus.Errorf("Error Creating Pod: %v'", err)

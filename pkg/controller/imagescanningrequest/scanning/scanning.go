@@ -5,62 +5,64 @@ import (
 
 	"github.com/redhat-cop/image-security/pkg/apis/imagescanningrequests/v1alpha1"
 	"github.com/redhat-cop/image-security/pkg/controller/config"
+	"github.com/redhat-cop/image-security/pkg/controller/images"
 	"github.com/redhat-cop/image-security/pkg/controller/util"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/cache"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/sirupsen/logrus"
 
 	corev1 "k8s.io/api/core/v1"
 )
 
-func UpdateOnScanningPodLaunch(message string, unsignedImage string, imageScanningRequest v1alpha1.ImageScanningRequest) error {
+func UpdateOnScanningPodLaunch(client client.Client, message string, unsignedImage string, imageScanningRequest v1alpha1.ImageScanningRequest) error {
 	imageScanningRequestCopy := imageScanningRequest.DeepCopy()
 
-	condition := util.NewImageExecutionCondition(message, corev1.ConditionTrue, v1alpha1.ImageExecutionConditionInitialization)
+	condition := util.NewImageExecutionCondition(message, corev1.ConditionTrue, images.ImageExecutionConditionInitialization)
 
 	imageScanningRequestCopy.Status.StartTime = condition.LastTransitionTime
 
-	return updateImageScanningRequest(imageScanningRequestCopy, condition, v1alpha1.PhaseRunning)
+	return updateImageScanningRequest(client, imageScanningRequestCopy, condition, images.PhaseRunning)
 }
 
-func UpdateOnImageScanningInitializationFailure(message string, imageScanningRequest v1alpha1.ImageScanningRequest) error {
+func UpdateOnImageScanningInitializationFailure(client client.Client, message string, imageScanningRequest v1alpha1.ImageScanningRequest) error {
 	imageScanningRequestCopy := imageScanningRequest.DeepCopy()
 
-	condition := util.NewImageExecutionCondition(message, corev1.ConditionFalse, v1alpha1.ImageExecutionConditionInitialization)
+	condition := util.NewImageExecutionCondition(message, corev1.ConditionFalse, images.ImageExecutionConditionInitialization)
 
 	imageScanningRequestCopy.Status.StartTime = condition.LastTransitionTime
 	imageScanningRequestCopy.Status.EndTime = condition.LastTransitionTime
 
-	return updateImageScanningRequest(imageScanningRequestCopy, condition, v1alpha1.PhaseFailed)
+	return updateImageScanningRequest(client, imageScanningRequestCopy, condition, images.PhaseFailed)
 }
 
-func updateImageScanningRequest(imageScanningRequest *v1alpha1.ImageScanningRequest, condition v1alpha1.ImageExecutionCondition, phase v1alpha1.ImageExecutionPhase) error {
+func updateImageScanningRequest(client client.Client, imageScanningRequest *v1alpha1.ImageScanningRequest, condition images.ImageExecutionCondition, phase images.ImageExecutionPhase) error {
 
 	imageScanningRequest.Status.Conditions = append(imageScanningRequest.Status.Conditions, condition)
 	imageScanningRequest.Status.Phase = phase
 
-	err := r.client.Update(context.TODO(), imageScanningRequest)
+	err := client.Update(context.TODO(), imageScanningRequest)
 
 	return err
 }
 
-func UpdateOnImageScanningCompletionError(message string, imageScanningRequest v1alpha1.ImageScanningRequest) error {
+func UpdateOnImageScanningCompletionError(client client.Client, message string, imageScanningRequest v1alpha1.ImageScanningRequest) error {
 	imageScanningRequestCopy := imageScanningRequest.DeepCopy()
 
-	condition := util.NewImageExecutionCondition(message, corev1.ConditionFalse, v1alpha1.ImageExecutionConditionFinished)
+	condition := util.NewImageExecutionCondition(message, corev1.ConditionFalse, images.ImageExecutionConditionFinished)
 
 	imageScanningRequestCopy.Status.EndTime = condition.LastTransitionTime
 
-	return updateImageScanningRequest(imageScanningRequestCopy, condition, v1alpha1.PhaseFailed)
+	return updateImageScanningRequest(client, imageScanningRequestCopy, condition, images.PhaseFailed)
 }
 
-func UpdateOnImageScanningCompletionSuccess(message string, totalRules int, passedRules int, failedRules int, imageScanningRequest v1alpha1.ImageScanningRequest) error {
+func UpdateOnImageScanningCompletionSuccess(client client.Client, message string, totalRules int, passedRules int, failedRules int, imageScanningRequest v1alpha1.ImageScanningRequest) error {
 	imageScanningRequestCopy := imageScanningRequest.DeepCopy()
 
-	condition := util.NewImageExecutionCondition(message, corev1.ConditionTrue, v1alpha1.ImageExecutionConditionFinished)
+	condition := util.NewImageExecutionCondition(message, corev1.ConditionTrue, images.ImageExecutionConditionFinished)
 
 	scanResult := &v1alpha1.ScanResult{
 		FailedRules: failedRules,
@@ -71,10 +73,10 @@ func UpdateOnImageScanningCompletionSuccess(message string, totalRules int, pass
 	imageScanningRequestCopy.Status.ScanResult = *scanResult
 	imageScanningRequestCopy.Status.EndTime = condition.LastTransitionTime
 
-	return updateImageScanningRequest(imageScanningRequestCopy, condition, v1alpha1.PhaseCompleted)
+	return updateImageScanningRequest(client, imageScanningRequestCopy, condition, images.PhaseCompleted)
 }
 
-func LaunchScanningPod(config config.Config, image string, ownerID string, ownerReference string) (string, error) {
+func LaunchScanningPod(client client.Client, config config.Config, image string, ownerID string, ownerReference string) (string, error) {
 
 	pod, err := createScanningPod(config.SignScanImage, config.TargetProject, image, ownerID, ownerReference, config.TargetServiceAccount)
 
@@ -82,7 +84,7 @@ func LaunchScanningPod(config config.Config, image string, ownerID string, owner
 		logrus.Errorf("Error Generating Pod: %v'", err)
 		return "", err
 	}
-	err := r.client.Create(context.TODO(), pod)
+	err = client.Create(context.TODO(), pod)
 
 	if err != nil {
 		logrus.Errorf("Error Creating Pod: %v'", err)
@@ -160,7 +162,7 @@ func createScanningPod(signScanImage string, targetProject string, image string,
 	return pod, nil
 }
 
-func DeleteScanningPod(name string, namespace string) error {
+func DeleteScanningPod(client client.Client, name string, namespace string) error {
 
 	pod := &corev1.Pod{
 		TypeMeta: metav1.TypeMeta{
@@ -173,6 +175,6 @@ func DeleteScanningPod(name string, namespace string) error {
 		},
 	}
 
-	return r.client.Delete(context.TODO(), pod)
+	return client.Delete(context.TODO(), pod)
 
 }
