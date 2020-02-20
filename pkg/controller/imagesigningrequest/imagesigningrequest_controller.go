@@ -16,6 +16,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/cache"
@@ -25,8 +26,9 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-
 	"sigs.k8s.io/controller-runtime/pkg/source"
+
+	imageset "github.com/openshift/client-go/image/clientset/versioned/typed/image/v1"
 )
 
 var log = logf.Log.WithName("controller_imagesigningrequest")
@@ -38,7 +40,11 @@ func Add(mgr manager.Manager) error {
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 	configuration := config.LoadConfig()
-	return &ReconcileImageSigningRequest{client: mgr.GetClient(), scheme: mgr.GetScheme(), config: configuration}
+	client, err := imageset.NewForConfig(mgr.GetConfig())
+	if err != nil {
+		return nil
+	}
+	return &ReconcileImageSigningRequest{client: mgr.GetClient(), scheme: mgr.GetScheme(), config: configuration, imageClient: client}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -73,9 +79,10 @@ var _ reconcile.Reconciler = &ReconcileImageSigningRequest{}
 type ReconcileImageSigningRequest struct {
 	// This client, initialized using mgr.Client() above, is a split client
 	// that reads objects from the cache and writes to the apiserver
-	client client.Client
-	scheme *runtime.Scheme
-	config config.Config
+	client      client.Client
+	scheme      *runtime.Scheme
+	config      config.Config
+	imageClient *imageset.ImageV1Client
 }
 
 // Reconcile reads that state of the cluster for a ImageSigningRequest object and makes changes based on the state read
@@ -106,9 +113,9 @@ func (r *ReconcileImageSigningRequest) Reconcile(request reconcile.Request) (rec
 	if instance.Status.Phase == emptyPhase {
 		_, requestIsTag := util.ParseImageStreamTag(instance.Spec.ImageStreamTag)
 
-		requestImageStreamTag := &imagev1.ImageStreamTag{}
-		err := r.client.Get(context.TODO(), types.NamespacedName{Name: instance.Spec.ImageStreamTag, Namespace: instance.ObjectMeta.Namespace}, requestImageStreamTag)
-
+		//requestImageStreamTag := &imagev1.ImageStreamTag{}
+		//err := r.client.Get(context.TODO(), types.NamespacedName{Name: instance.Spec.ImageStreamTag, Namespace: instance.ObjectMeta.Namespace}, requestImageStreamTag)
+		requestImageStreamTag, err := r.imageClient.ImageStreamTags(instance.ObjectMeta.Namespace).Get(instance.Spec.ImageStreamTag, metav1.GetOptions{})
 		if err != nil {
 
 			errorMessage := ""

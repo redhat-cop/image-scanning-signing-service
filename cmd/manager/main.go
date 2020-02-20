@@ -11,6 +11,8 @@ import (
 	"github.com/redhat-cop/image-security/pkg/controller"
 	"github.com/redhat-cop/image-security/version"
 
+	imagev1 "github.com/openshift/api/image/v1"
+	ossecurityv1 "github.com/openshift/api/security/v1"
 	"github.com/operator-framework/operator-sdk/pkg/k8sutil"
 	kubemetrics "github.com/operator-framework/operator-sdk/pkg/kube-metrics"
 	"github.com/operator-framework/operator-sdk/pkg/leader"
@@ -81,7 +83,7 @@ func main() {
 
 	ctx := context.TODO()
 	// Become the leader before proceeding
-	err = leader.Become(ctx, "project-initialize-lock")
+	err = leader.Become(ctx, "image-security-lock")
 	if err != nil {
 		log.Error(err, "")
 		os.Exit(1)
@@ -89,7 +91,7 @@ func main() {
 
 	// Create a new Cmd to provide shared dependencies and start components
 	mgr, err := manager.New(cfg, manager.Options{
-		Namespace:          namespace,
+		Namespace:          "",
 		MapperProvider:     restmapper.NewDynamicRESTMapper,
 		MetricsBindAddress: fmt.Sprintf("%s:%d", metricsHost, metricsPort),
 	})
@@ -102,6 +104,17 @@ func main() {
 
 	// Setup Scheme for all resources
 	if err := apis.AddToScheme(mgr.GetScheme()); err != nil {
+		log.Error(err, "")
+		os.Exit(1)
+	}
+
+	// Setup OpenShift Schemes
+	if err := ossecurityv1.AddToScheme(mgr.GetScheme()); err != nil {
+		log.Error(err, "")
+		os.Exit(1)
+	}
+
+	if err := imagev1.AddToScheme(mgr.GetScheme()); err != nil {
 		log.Error(err, "")
 		os.Exit(1)
 	}

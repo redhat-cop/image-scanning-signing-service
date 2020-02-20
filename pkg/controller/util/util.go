@@ -70,3 +70,17 @@ func ExtractImageIDFromImageReference(dockerImageReference string) (string, stri
 
 	return dockerImageRegistry, dockerImageID, nil
 }
+
+func GenerateImageStreamTag(imageStreamTag string, namespace string) *imagev1.ImageStreamTag {
+	return &imagev1.ImageStreamTag{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "ImageStreamTag",
+			APIVersion: "image.openshift.io/v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      imageStreamTag,
+			Namespace: namespace,
+		},
+	}
+
+}

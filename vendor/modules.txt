@@ -76,6 +76,10 @@ github.com/modern-go/reflect2
 github.com/openshift/api/image/docker10
 github.com/openshift/api/image/dockerpre012
 github.com/openshift/api/image/v1
+github.com/openshift/api/security/v1
+# github.com/openshift/client-go v0.0.0-20190923180330-3b6373338c9b
+github.com/openshift/client-go/image/clientset/versioned/scheme
+github.com/openshift/client-go/image/clientset/versioned/typed/image/v1
 # github.com/operator-framework/operator-sdk v0.13.0
 github.com/operator-framework/operator-sdk/pkg/k8sutil
 github.com/operator-framework/operator-sdk/pkg/kube-metrics

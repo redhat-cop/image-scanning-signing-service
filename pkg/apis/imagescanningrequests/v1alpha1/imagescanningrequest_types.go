@@ -45,3 +45,7 @@ type ScanResult struct {
 	PassedRules int `json:"passedRules"`
 	FailedRules int `json:"failedRules"`
 }
+
+func init() {
+	SchemeBuilder.Register(&ImageScanningRequest{}, &ImageScanningRequestList{})
+}
