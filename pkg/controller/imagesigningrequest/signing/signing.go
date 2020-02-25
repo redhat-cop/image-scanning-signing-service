@@ -72,7 +72,7 @@ func updateImageSigningRequest(client client.Client, imageSigningRequest *v1alph
 
 func LaunchSigningPod(client client.Client, config config.Config, image string, imageDigest string, ownerID string, ownerReference string, gpgSecretName string, gpgSignBy string) (string, error) {
 
-	pod, err := createSigningPod(config.SignScanImage, config.TargetProject, image, imageDigest, ownerID, ownerReference, config.TargetServiceAccount, gpgSecretName, gpgSignBy)
+	pod, err := createSigningPod(config.SignScanImage, config.TargetProject, image, imageDigest, ownerID, ownerReference, "imagemanager", gpgSecretName, gpgSignBy)
 
 	if err != nil {
 		logrus.Errorf("Error Generating Pod: %v'", err)
@@ -124,6 +124,10 @@ func createSigningPod(signScanImage string, targetProject string, image string, 
 					{
 						Name:  "IMAGE",
 						Value: image,
+					},
+					{
+						Name:  "PUSH_TYPE",
+						Value: "podman",
 					},
 					{
 						Name:  "DIGEST",
