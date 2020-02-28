@@ -1,0 +1,7 @@
+apiVersion: imagescanningrequests.cop.redhat.com/v1alpha1
+kind: ImageScanningRequest
+metadata:
+  name: example-imagescanningrequest
+spec:
+  # Add fields here
+  size: 3

@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: image-security
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: image-security
+  template:
+    metadata:
+      labels:
+        name: image-security
+    spec:
+      serviceAccountName: image-security
+      containers:
+        - name: image-security
+          # Replace this with the built image name
+          image: REPLACE_IMAGE
+          command:
+          - image-security
+          imagePullPolicy: Always
+          env:
+            - name: WATCH_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: OPERATOR_NAME
+              value: "image-security"

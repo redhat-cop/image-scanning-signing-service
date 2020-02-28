@@ -1,0 +1,18 @@
+#!/bin/bash
+
+WORKING_DIR=$(mktemp -d -t cve-scan-XXXXX)
+IMAGE_CONTENT=${WORKING_DIR}/image-content
+RESULTS=/tmp/results
+RESULT_SHARE=/tmp/share-results
+DOCKER_CFG_HOME=/tmp/dockercfg
+mkdir -p $IMAGE_CONTENT $DOCKER_CFG_HOME
+oc login https://kubernetes.default.svc.cluster.local --certificate-authority=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt --token=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token) > /dev/null 2>&1 
+SA_FULLNAME=$(oc whoami)
+SA_NAME="${SA_FULLNAME##*:}"
+NAMESPACE=$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace)
+SA_JSON=$(oc get sa -n $NAMESPACE $SA_NAME -o json)
+DOCKERCFG_SECRET_NAME=$(echo "${SA_JSON}" | jq -r ".imagePullSecrets[] | select( .name | contains(\"${SA_NAME}-dockercfg\")).name")
+
+oc get secret -n $NAMESPACE $DOCKERCFG_SECRET_NAME -o json | jq -r ".data[] | select(\".dockercfg\")" | base64 -d > $DOCKER_CFG_HOME/.dockercfg
+
+image-inspector -chroot --path=${IMAGE_CONTENT} --scan-results-dir=${RESULTS} --scan-type=openscap  --dockercfg=$DOCKER_CFG_HOME/.dockercfg --image=$IMAGE -serve=0.0.0.0:8080
