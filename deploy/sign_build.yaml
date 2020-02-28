@@ -18,11 +18,11 @@ items:
         kind: ImageStreamTag
         name: image-sign-scan-base:latest
     source:
-      contextDir: "images/image-sign-scan-base"
-      git:
-        ref: "signing-webinar"
-        uri: "https://github.com/jgoldsmith613/image-scanning-signing-service.git"
-      type: Git
+      type: Binary
+      binary: {}
+      secrets:
+        - secret:
+            name: entitlement
     strategy:
       dockerStrategy:
         buildArgs:
@@ -30,8 +30,9 @@ items:
           value: "4.3"
         from:
           kind: ImageStreamTag
-          name: centos:latest
+          name: ubi8:latest
       type: Docker
+    postCommit: {}
     triggers:
     - type: ConfigChange
     - imageChange: {}
