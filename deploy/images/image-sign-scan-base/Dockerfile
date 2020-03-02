@@ -18,10 +18,9 @@ RUN rm /etc/rhsm-host && \
     tar -xvf oc.tar.gz && \
     chmod +x ./oc && \
     cp oc /usr/bin && \
- #   sed 's/#mount_program/mount_program/' /etc/containers/storage.conf -i cp /etc/containers/storage.conf /etc/containers/storage.conf.orig
+    sed 's/#mount_program/mount_program/' /etc/containers/storage.conf -i cp /etc/containers/storage.conf /etc/containers/storage.conf.orig && \
     sed -i 's/driver = "overlay"/driver = "vfs"/' /etc/containers/storage.conf && \
     cp /usr/share/containers/libpod.conf /etc/containers/ && \
     sed -i 's/cgroup_manager = "systemd"/cgroup_manager = "cgroupfs"/' /etc/containers/libpod.conf && \
     echo 'events_logger = "file"' >> /etc/containers/libpod.conf && \
     sed -i "s/'registry.redhat.io'/'registry.access.redhat.com', 'registry.redhat.io'/" /etc/containers/registries.conf
-#USER 1001

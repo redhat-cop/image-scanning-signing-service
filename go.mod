@@ -6,7 +6,7 @@ require (
 	github.com/openshift/api v3.9.1-0.20190924102528-32369d4db2ad+incompatible
 	github.com/openshift/client-go v0.0.0-20190923180330-3b6373338c9b
 	github.com/operator-framework/operator-sdk v0.13.0
-	github.com/redhat-cop/image-scanning-signing-service v1.0.0
+	github.com/redhat-cop/image-scanning-signing-service v1.0.0 // indirect
 	github.com/redhat-cop/quay-operator v1.0.2 // indirect
 	github.com/sirupsen/logrus v1.4.2
 	github.com/spf13/pflag v1.0.5

@@ -141,6 +141,7 @@ func createSigningPod(signScanImage string, targetProject string, image string, 
 				SecurityContext: &corev1.SecurityContext{
 					Privileged: &priv,
 				},
+				// TODO - Add the containers/sigstore volume
 				VolumeMounts: []corev1.VolumeMount{
 					{
 						Name:      "docker-socket",
