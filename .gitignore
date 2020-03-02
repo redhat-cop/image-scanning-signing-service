@@ -3,4 +3,4 @@ roles
 .DS_Store
 tmp
 galaxy
-
+vendor/
