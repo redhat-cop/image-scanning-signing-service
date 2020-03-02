@@ -32,6 +32,12 @@ $ oc apply -f deploy/images.yaml
 $ oc apply -f deploy/sign_build.yaml
 ```
 
+Build signing image (locally)
+```
+$ cd /deploy/images/image-sign-scan-base
+$ oc start-build image-sign-scan-base --from-dir=./ --follow
+```
+
 Login to the cluster via the Service Account above
 ```
 $ oc sa get-token imagemanager
