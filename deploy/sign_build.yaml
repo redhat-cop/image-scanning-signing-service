@@ -22,7 +22,8 @@ items:
       binary: {}
       secrets:
         - secret:
-            name: entitlement
+            name: etc-pki-entitlement
+          destinationDir: etc-pki-entitlement
     strategy:
       dockerStrategy:
         buildArgs:
