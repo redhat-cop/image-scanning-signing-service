@@ -12,11 +12,10 @@ spec:
       labels:
         name: image-security
     spec:
-      serviceAccountName: image-security
+      serviceAccountName: imagemanager
       containers:
         - name: image-security
-          # Replace this with the built image name
-          image: REPLACE_IMAGE
+          image: quay.io/cnuland/image-signing-operator
           command:
           - image-security
           imagePullPolicy: Always
@@ -31,3 +30,5 @@ spec:
                   fieldPath: metadata.name
             - name: OPERATOR_NAME
               value: "image-security"
+            - name: SIGN_SCAN_IMAGE
+              value: "quay.io/cnuland/image-signing-centos8"

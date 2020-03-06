@@ -1,0 +1,40 @@
+apiVersion: v1
+kind: List
+items:
+- apiVersion: v1
+  kind: ImageStream
+  metadata:
+    name: image-sign-scan-base
+  spec:
+    lookupPolicy:
+      local: true
+- apiVersion: v1
+  kind: BuildConfig
+  metadata:
+    name: image-sign-scan-base
+  spec:
+    output:
+      to:
+        kind: ImageStreamTag
+        name: image-sign-scan-base:latest
+    source:
+      type: Binary
+      binary: {}
+      secrets:
+        - secret:
+            name: etc-pki-entitlement
+          destinationDir: etc-pki-entitlement
+    strategy:
+      dockerStrategy:
+        buildArgs:
+        - name: OCP_VERSION
+          value: "4.3"
+        from:
+          kind: ImageStreamTag
+          name: ubi8:latest
+      type: Docker
+    postCommit: {}
+    triggers:
+    - type: ConfigChange
+    - imageChange: {}
+      type: ImageChange

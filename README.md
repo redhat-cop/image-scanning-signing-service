@@ -5,7 +5,7 @@ _This repository is currently undergoing active development. Functionality may b
 
 Operator to support signing of images within OCP 4.x clusters [OpenShift Container Platform](https://www.openshift.com/container-platform/index.html)
 
-### Run Locally (OpenShift)
+### Build & Run Locally (OpenShift)
 
 Run the following steps to run the operator locally. The operator will require `cluster-admin` permissions that can be applied using the resources provided in the deploy/ folder.
 
@@ -20,6 +20,24 @@ Create the expected namespace
 $ oc new-project image-management
 ```
 
+Select a distribution
+
+UBI
+```
+$ DISTRO = ubi
+```
+Note: For UBI build to work you need to add a subscription entitlement key
+```
+oc create secret generic etc-pki-entitlement --from-file=entitlement.pem=/path/to/entitlement/file/{pid}.pem --from-file=entitlement-key.pem=/path/to/entitlement/file/{pid}.pem
+```
+https://docs.openshift.com/container-platform/4.3/builds/running-entitled-builds.html#builds-source-secrets-entitlements_running-entitled-builds
+
+
+Centos
+```
+$ DISTRO = centos
+```
+
 Add crd and resources to cluster
 ```
 $ oc apply -f deploy/crds/imagesigningrequests.cop.redhat.com_imagesigningrequests_crd.yaml
@@ -28,23 +46,23 @@ $ oc apply -f deploy/role.yaml
 $ oc apply -f deploy/role_binding.yaml
 $ oc apply -f deploy/scc.yaml
 $ oc apply -f deploy/secret.yaml
-$ oc apply -f deploy/images.yaml
-$ oc apply -f deploy/sign_build.yaml
+$ oc apply -f deploy/${DISTRO}/image.yaml
+$ oc apply -f deploy/${DISTRO}/sign_build.yaml
 ```
 
 Build signing image (locally)
 ```
-$ cd /deploy/images/image-sign-scan-base
+$ cd /deploy/${DISTRO}/signing-image
 $ oc start-build image-sign-scan-base --from-dir=./ --follow
 ```
 
 Login to the cluster via the Service Account above
 ```
-$ oc sa get-token imagemanager
-$ oc login --token="{above_token}"
+$ TOKEN=$(oc sa get-token imagemanager)
+$ oc login --token="${TOKEN}"
 ```
 
 Run Operator-SDK
 ```
-$ operator-sdk up local --namespace="image-management" 
+$ operator-sdk run --local --namespace="image-management" 
 ```
