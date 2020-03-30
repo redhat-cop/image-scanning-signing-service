@@ -142,7 +142,7 @@ func (r *ReconcileImageSigningRequest) Reconcile(request reconcile.Request) (rec
 		if err != nil {
 			return reconcile.Result{}, err
 		}
-
+		// TODO - Need to validate this for OCP 4.x
 		if requestImageStreamTag.Image.Signatures != nil {
 			errorMessage := fmt.Sprintf("Signatures Exist on Image '%s'", dockerImageID)
 

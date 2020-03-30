@@ -1,6 +1,5 @@
-.vscode
-roles
-.DS_Store
-tmp
-galaxy
 vendor/
+build/_output/
+build/_test/
+# Openshift local cluster
+openshift.local.clusterup/% 
