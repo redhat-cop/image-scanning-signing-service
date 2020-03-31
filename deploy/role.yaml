@@ -91,10 +91,8 @@ rules:
   - "imagescanningrequests.cop.redhat.com"
   attributeRestrictions: null
   resources:
+  - '*'
   - imagesigningrequests
   - imagescanningrequests
   verbs:
-  - get
-  - list
-  - update
-  - watch
+  - '*'

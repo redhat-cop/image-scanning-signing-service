@@ -3,6 +3,7 @@ package util
 import (
 	"errors"
 	"strings"
+	"time"
 
 	"github.com/redhat-cop/image-security/pkg/controller/images"
 	corev1 "k8s.io/api/core/v1"
@@ -14,7 +15,7 @@ import (
 func NewImageExecutionCondition(message string, conditionStatus corev1.ConditionStatus, conditionType images.ImageExecutionConditionType) images.ImageExecutionCondition {
 
 	return images.ImageExecutionCondition{
-		LastTransitionTime: metav1.Now(),
+		LastTransitionTime: metav1.NewTime(time.Now()),
 		Message:            message,
 		Status:             conditionStatus,
 		Type:               conditionType,

@@ -108,7 +108,6 @@ func (r *ReconcileImageSigningRequest) Reconcile(request reconcile.Request) (rec
 	}
 
 	imageSigningRequestMetadataKey, _ := cache.MetaNamespaceKeyFunc(instance)
-
 	emptyPhase := imagesigningrequestsv1alpha1.ImageSigningRequestStatus{}.Phase
 	if instance.Status.Phase == emptyPhase {
 		_, requestIsTag := util.ParseImageStreamTag(instance.Spec.ImageStreamTag)

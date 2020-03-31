@@ -5,11 +5,16 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// ImageSigningRequestSpec defines the desired state of ImageSigningRequest
+// +k8s:openapi-gen=true
 type ImageSigningRequestSpec struct {
 	ImageStreamTag       string `json:"imageStreamTag"`
 	SigningKeySecretName string `json:"signingKeySecretName,omitempty"`
 	SigningKeySignBy     string `json:"signingKeySignBy,omitempty"`
 }
+
+// ImageSigningRequestStatus defines the observed state of ImageSigningRequest
+// +k8s:openapi-gen=true
 type ImageSigningRequestStatus struct {
 	Conditions    []images.ImageExecutionCondition `json:"conditions,omitempty"`
 	Phase         images.ImageExecutionPhase       `json:"phase,omitempty"`

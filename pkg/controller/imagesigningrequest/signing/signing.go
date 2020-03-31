@@ -64,12 +64,9 @@ func updateImageSigningRequest(client client.Client, imageSigningRequest *v1alph
 
 	imageSigningRequest.Status.Conditions = append(imageSigningRequest.Status.Conditions, condition)
 	imageSigningRequest.Status.Phase = phase
-	logrus.Infof("Going to update the signing request with a status of ", phase)
+	logrus.Infof("Going to update the signing request with a status and time ", phase, condition.LastTransitionTime)
 
-	err := client.Update(context.TODO(), imageSigningRequest)
-	if err != nil {
-		logrus.Errorf("Error updating pod :( ", err)
-	}
+	err := client.Status().Update(context.TODO(), imageSigningRequest)
 	return err
 }
 
