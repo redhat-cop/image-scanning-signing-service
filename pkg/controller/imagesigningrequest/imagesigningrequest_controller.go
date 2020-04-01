@@ -95,13 +95,11 @@ type ReconcileImageSigningRequest struct {
 func (r *ReconcileImageSigningRequest) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	reqLogger := log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
 	reqLogger.Info("Reconciling ImageSigningRequest")
-	logrus.Infof("Reconcile", request.NamespacedName)
 
 	// Fetch the ImageSigningRequest instance
 	instance := &imagesigningrequestsv1alpha1.ImageSigningRequest{}
 	err := r.client.Get(context.TODO(), request.NamespacedName, instance)
 	if err != nil {
-		logrus.Infof("got here 4")
 		if errors.IsNotFound(err) {
 			return reconcile.Result{}, nil
 		}
@@ -112,7 +110,6 @@ func (r *ReconcileImageSigningRequest) Reconcile(request reconcile.Request) (rec
 	imageSigningRequestMetadataKey, _ := cache.MetaNamespaceKeyFunc(instance)
 	emptyPhase := imagesigningrequestsv1alpha1.ImageSigningRequestStatus{}.Phase
 	if instance.Status.Phase == emptyPhase {
-		logrus.Infof("got here 5")
 		_, requestIsTag := util.ParseImageStreamTag(instance.Spec.ImageStreamTag)
 
 		//requestImageStreamTag := &imagev1.ImageStreamTag{}
@@ -210,8 +207,7 @@ func (r *ReconcileImageSigningRequest) Reconcile(request reconcile.Request) (rec
 				}
 
 			}
-
-			signingPodName, err := signing.LaunchSigningPod(r.client, r.config, fmt.Sprintf("%s:%s", dockerImageRegistry, requestIsTag), dockerImageID, string(instance.ObjectMeta.UID), imageSigningRequestMetadataKey, gpgSecretName, gpgSignBy)
+			signingPodName, err := signing.LaunchSigningPod(r.client, r.scheme, r.config, instance, fmt.Sprintf("%s:%s", dockerImageRegistry, requestIsTag), dockerImageID, string(instance.ObjectMeta.UID), imageSigningRequestMetadataKey, gpgSecretName, gpgSignBy)
 
 			if err != nil {
 				errorMessage := fmt.Sprintf("Error Occurred Creating Signing Pod '%v'", err)
@@ -244,23 +240,19 @@ func (r *ReconcileImageSigningRequest) Reconcile(request reconcile.Request) (rec
 		err := r.client.Get(context.TODO(), request.NamespacedName, instance)
 		podOwnerAnnotation := pod.Annotations[common.CopOwnerAnnotation]
 		podMetadataKey, _ := cache.MetaNamespaceKeyFunc(pod)
-		logrus.Infof("got here", pod)
 
 		if err != nil {
-			logrus.Infof("got here 8")
 			logrus.Warnf("Could not find ImageSigningRequest '%s' from pod '%s'", podOwnerAnnotation, podMetadataKey)
 			return reconcile.Result{}, nil
 		}
 
 		// Check if ImageSigningRequest has already been marked as Succeeded or Failed
 		if instance.Status.Phase == images.PhaseCompleted || instance.Status.Phase == images.PhaseFailed {
-			logrus.Infof("got here 2")
 			return reconcile.Result{}, nil
 		}
 
 		// Check to verfiy ImageSigningRequest is in phase Running
 		if instance.Status.Phase != images.PhaseRunning {
-			logrus.Infof("got here 3")
 			return reconcile.Result{}, nil
 		}
 
@@ -277,7 +269,6 @@ func (r *ReconcileImageSigningRequest) Reconcile(request reconcile.Request) (rec
 			return reconcile.Result{}, nil
 
 		} else if pod.Status.Phase == corev1.PodSucceeded {
-			logrus.Infof("GOT HERE I NEEDED")
 			requestImageStreamTag := &imagev1.ImageStreamTag{}
 			err := r.client.Get(context.TODO(), types.NamespacedName{Name: instance.Spec.ImageStreamTag, Namespace: instance.ObjectMeta.Namespace}, requestImageStreamTag)
 
@@ -299,7 +290,6 @@ func (r *ReconcileImageSigningRequest) Reconcile(request reconcile.Request) (rec
 			_, dockerImageID, err := util.ExtractImageIDFromImageReference(requestImageStreamTag.Image.DockerImageReference)
 
 			if err != nil {
-				logrus.Infof("got here 7")
 				return reconcile.Result{}, err
 			}
 

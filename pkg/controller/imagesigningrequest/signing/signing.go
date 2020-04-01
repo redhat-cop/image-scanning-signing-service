@@ -11,7 +11,7 @@ import (
 	"github.com/redhat-cop/image-security/pkg/controller/util"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -23,7 +23,6 @@ func UpdateOnImageSigningCompletionError(client client.Client, message string, i
 	condition := util.NewImageExecutionCondition(message, corev1.ConditionFalse, images.ImageExecutionConditionFinished)
 
 	imageSigningRequest.Status.EndTime = condition.LastTransitionTime
-	logrus.Infof("Whats the time 1 ", imageSigningRequest.Status.EndTime)
 
 	return updateImageSigningRequest(client, &imageSigningRequest, condition, images.PhaseFailed)
 }
@@ -34,7 +33,6 @@ func UpdateOnImageSigningCompletionSuccess(client client.Client, message string,
 
 	imageSigningRequest.Status.SignedImage = signedImage
 	imageSigningRequest.Status.EndTime = condition.LastTransitionTime
-	logrus.Infof("Whats the time 2 ", imageSigningRequest.Status.EndTime)
 
 	return updateImageSigningRequest(client, &imageSigningRequest, condition, images.PhaseCompleted)
 }
@@ -45,7 +43,6 @@ func UpdateOnImageSigningInitializationFailure(client client.Client, message str
 
 	imageSigningRequest.Status.StartTime = condition.LastTransitionTime
 	imageSigningRequest.Status.EndTime = condition.LastTransitionTime
-	logrus.Infof("Whats the time 3 ", imageSigningRequest.Status.EndTime)
 
 	return updateImageSigningRequest(client, &imageSigningRequest, condition, images.PhaseFailed)
 }
@@ -57,7 +54,6 @@ func UpdateOnSigningPodLaunch(client client.Client, message string, unsignedImag
 	imageSigningRequest.Status.UnsignedImage = unsignedImage
 	imageSigningRequest.Status.StartTime = condition.LastTransitionTime
 	imageSigningRequest.Status.EndTime = metav1.NewTime(time.Time{}).String()
-	logrus.Infof("Whats the time 4 ", imageSigningRequest.Status.EndTime)
 
 	return updateImageSigningRequest(client, &imageSigningRequest, condition, images.PhaseRunning)
 }
@@ -66,16 +62,14 @@ func updateImageSigningRequest(client client.Client, imageSigningRequest *v1alph
 
 	imageSigningRequest.Status.Conditions = append(imageSigningRequest.Status.Conditions, condition)
 	imageSigningRequest.Status.Phase = phase
-	logrus.Infof("Going to update the signing request with a status and time ", phase, imageSigningRequest.Status.EndTime)
 
 	err := client.Status().Update(context.TODO(), imageSigningRequest)
 	return err
 }
 
-func LaunchSigningPod(client client.Client, config config.Config, image string, imageDigest string, ownerID string, ownerReference string, gpgSecretName string, gpgSignBy string) (string, error) {
+func LaunchSigningPod(client client.Client, scheme *runtime.Scheme, config config.Config, instance *v1alpha1.ImageSigningRequest, image string, imageDigest string, ownerID string, ownerReference string, gpgSecretName string, gpgSignBy string) (string, error) {
 
-	pod, err := createSigningPod(config.SignScanImage, config.TargetProject, image, imageDigest, ownerID, ownerReference, "imagemanager", gpgSecretName, gpgSignBy)
-
+	pod, err := createSigningPod(scheme, instance, config.SignScanImage, config.TargetProject, image, imageDigest, ownerID, ownerReference, "imagemanager", gpgSecretName, gpgSignBy)
 	if err != nil {
 		logrus.Errorf("Error Generating Pod: %v'", err)
 		return "", err
@@ -90,17 +84,14 @@ func LaunchSigningPod(client client.Client, config config.Config, image string, 
 
 	var key string
 	if key, err = cache.MetaNamespaceKeyFunc(pod); err != nil {
-		runtime.HandleError(err)
 		return "", err
 	}
 
 	return key, nil
 }
 
-func createSigningPod(signScanImage string, targetProject string, image string, imageDigest string, ownerID string, ownerReference string, serviceAccount string, gpgSecret string, signBy string) (*corev1.Pod, error) {
-
+func createSigningPod(scheme *runtime.Scheme, instance *v1alpha1.ImageSigningRequest, signScanImage string, targetProject string, image string, imageDigest string, ownerID string, ownerReference string, serviceAccount string, gpgSecret string, signBy string) (*corev1.Pod, error) {
 	priv := true
-
 	pod := &corev1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
@@ -110,7 +101,7 @@ func createSigningPod(signScanImage string, targetProject string, image string, 
 			Name:        ownerID,
 			Namespace:   targetProject,
 			Labels:      map[string]string{"type": "image-signing"},
-			Annotations: map[string]string{"cop.redhat.com/owner": ownerReference, "cop.redhat.com/type": "image-signing"},
+			Annotations: map[string]string{"cop.redhat.com/type": "image-signing"},
 		},
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{{
