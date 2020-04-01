@@ -3,6 +3,7 @@ package signing
 import (
 	"context"
 	"os"
+	"time"
 
 	"github.com/redhat-cop/image-security/pkg/apis/imagesigningrequests/v1alpha1"
 	"github.com/redhat-cop/image-security/pkg/controller/config"
@@ -18,53 +19,54 @@ import (
 )
 
 func UpdateOnImageSigningCompletionError(client client.Client, message string, imageSigningRequest v1alpha1.ImageSigningRequest) error {
-	imageSigningRequestCopy := imageSigningRequest.DeepCopy()
 
 	condition := util.NewImageExecutionCondition(message, corev1.ConditionFalse, images.ImageExecutionConditionFinished)
 
-	imageSigningRequestCopy.Status.EndTime = condition.LastTransitionTime
+	imageSigningRequest.Status.EndTime = condition.LastTransitionTime
+	logrus.Infof("Whats the time 1 ", imageSigningRequest.Status.EndTime)
 
-	return updateImageSigningRequest(client, imageSigningRequestCopy, condition, images.PhaseFailed)
+	return updateImageSigningRequest(client, &imageSigningRequest, condition, images.PhaseFailed)
 }
 
 func UpdateOnImageSigningCompletionSuccess(client client.Client, message string, signedImage string, imageSigningRequest v1alpha1.ImageSigningRequest) error {
-	imageSigningRequestCopy := imageSigningRequest.DeepCopy()
 
 	condition := util.NewImageExecutionCondition(message, corev1.ConditionTrue, images.ImageExecutionConditionFinished)
 
-	imageSigningRequestCopy.Status.SignedImage = signedImage
-	imageSigningRequestCopy.Status.EndTime = condition.LastTransitionTime
+	imageSigningRequest.Status.SignedImage = signedImage
+	imageSigningRequest.Status.EndTime = condition.LastTransitionTime
+	logrus.Infof("Whats the time 2 ", imageSigningRequest.Status.EndTime)
 
-	return updateImageSigningRequest(client, imageSigningRequestCopy, condition, images.PhaseCompleted)
+	return updateImageSigningRequest(client, &imageSigningRequest, condition, images.PhaseCompleted)
 }
 
 func UpdateOnImageSigningInitializationFailure(client client.Client, message string, imageSigningRequest v1alpha1.ImageSigningRequest) error {
-	imageSigningRequestCopy := imageSigningRequest.DeepCopy()
 
 	condition := util.NewImageExecutionCondition(message, corev1.ConditionFalse, images.ImageExecutionConditionInitialization)
 
-	imageSigningRequestCopy.Status.StartTime = condition.LastTransitionTime
-	imageSigningRequestCopy.Status.EndTime = condition.LastTransitionTime
+	imageSigningRequest.Status.StartTime = condition.LastTransitionTime
+	imageSigningRequest.Status.EndTime = condition.LastTransitionTime
+	logrus.Infof("Whats the time 3 ", imageSigningRequest.Status.EndTime)
 
-	return updateImageSigningRequest(client, imageSigningRequestCopy, condition, images.PhaseFailed)
+	return updateImageSigningRequest(client, &imageSigningRequest, condition, images.PhaseFailed)
 }
 
 func UpdateOnSigningPodLaunch(client client.Client, message string, unsignedImage string, imageSigningRequest v1alpha1.ImageSigningRequest) error {
-	imageSigningRequestCopy := imageSigningRequest.DeepCopy()
 
 	condition := util.NewImageExecutionCondition(message, corev1.ConditionTrue, images.ImageExecutionConditionInitialization)
 
-	imageSigningRequestCopy.Status.UnsignedImage = unsignedImage
-	imageSigningRequestCopy.Status.StartTime = condition.LastTransitionTime
+	imageSigningRequest.Status.UnsignedImage = unsignedImage
+	imageSigningRequest.Status.StartTime = condition.LastTransitionTime
+	imageSigningRequest.Status.EndTime = metav1.NewTime(time.Time{}).String()
+	logrus.Infof("Whats the time 4 ", imageSigningRequest.Status.EndTime)
 
-	return updateImageSigningRequest(client, imageSigningRequestCopy, condition, images.PhaseRunning)
+	return updateImageSigningRequest(client, &imageSigningRequest, condition, images.PhaseRunning)
 }
 
 func updateImageSigningRequest(client client.Client, imageSigningRequest *v1alpha1.ImageSigningRequest, condition images.ImageExecutionCondition, phase images.ImageExecutionPhase) error {
 
 	imageSigningRequest.Status.Conditions = append(imageSigningRequest.Status.Conditions, condition)
 	imageSigningRequest.Status.Phase = phase
-	logrus.Infof("Going to update the signing request with a status and time ", phase, condition.LastTransitionTime)
+	logrus.Infof("Going to update the signing request with a status and time ", phase, imageSigningRequest.Status.EndTime)
 
 	err := client.Status().Update(context.TODO(), imageSigningRequest)
 	return err

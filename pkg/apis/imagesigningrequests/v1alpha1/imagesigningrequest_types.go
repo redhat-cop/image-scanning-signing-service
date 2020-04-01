@@ -20,8 +20,8 @@ type ImageSigningRequestStatus struct {
 	Phase         images.ImageExecutionPhase       `json:"phase,omitempty"`
 	SignedImage   string                           `json:"signedImage,omitempty"`
 	UnsignedImage string                           `json:"unsignedImage,omitempty"`
-	StartTime     metav1.Time                      `json:"startTime,omitempty"`
-	EndTime       metav1.Time                      `json:"endTime,omitempty"`
+	StartTime     string                           `json:"startTime,omitempty"`
+	EndTime       string                           `json:"endTime,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

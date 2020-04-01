@@ -30,6 +30,7 @@ spec:
         metadata:
           type: object
         spec:
+          description: ImageSigningRequestSpec defines the desired state of ImageSigningRequest
           properties:
             imageStreamTag:
               type: string
@@ -41,12 +42,12 @@ spec:
           - imageStreamTag
           type: object
         status:
+          description: ImageSigningRequestStatus defines the observed state of ImageSigningRequest
           properties:
             conditions:
               items:
                 properties:
                   lastTransitionTime:
-                    format: date-time
                     type: string
                   message:
                     type: string
@@ -57,14 +58,12 @@ spec:
                 type: object
               type: array
             endTime:
-              format: date-time
               type: string
             phase:
               type: string
             signedImage:
               type: string
             startTime:
-              format: date-time
               type: string
             unsignedImage:
               type: string

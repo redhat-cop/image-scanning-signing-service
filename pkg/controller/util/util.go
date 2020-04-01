@@ -15,7 +15,7 @@ import (
 func NewImageExecutionCondition(message string, conditionStatus corev1.ConditionStatus, conditionType images.ImageExecutionConditionType) images.ImageExecutionCondition {
 
 	return images.ImageExecutionCondition{
-		LastTransitionTime: metav1.NewTime(time.Now()),
+		LastTransitionTime: metav1.NewTime(time.Now()).String(),
 		Message:            message,
 		Status:             conditionStatus,
 		Type:               conditionType,
