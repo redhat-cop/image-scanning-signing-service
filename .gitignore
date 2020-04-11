@@ -1,5 +1,5 @@
 vendor/
-build/_output/`
+build/_output/
 build/_test/
 # Openshift local cluster
 openshift.local.clusterup/% 
