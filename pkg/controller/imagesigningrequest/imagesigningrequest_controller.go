@@ -5,11 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	imagev1 "github.com/openshift/api/image/v1"
 	imagesigningrequestsv1alpha1 "github.com/redhat-cop/image-security/pkg/apis/imagesigningrequests/v1alpha1"
-	"github.com/redhat-cop/image-security/pkg/controller/common"
 	"github.com/redhat-cop/image-security/pkg/controller/config"
-	"github.com/redhat-cop/image-security/pkg/controller/images"
 	"github.com/redhat-cop/image-security/pkg/controller/imagesigningrequest/signing"
 	"github.com/redhat-cop/image-security/pkg/controller/util"
 	"github.com/sirupsen/logrus"
@@ -231,76 +228,8 @@ func (r *ReconcileImageSigningRequest) Reconcile(request reconcile.Request) (rec
 				return reconcile.Result{}, err
 			}
 
-			return reconcile.Result{}, nil
-
 		}
-	} else {
-
-		pod := &corev1.Pod{}
-		err := r.client.Get(context.TODO(), request.NamespacedName, instance)
-		podOwnerAnnotation := pod.Annotations[common.CopOwnerAnnotation]
-		podMetadataKey, _ := cache.MetaNamespaceKeyFunc(pod)
-
-		if err != nil {
-			logrus.Warnf("Could not find ImageSigningRequest '%s' from pod '%s'", podOwnerAnnotation, podMetadataKey)
-			return reconcile.Result{}, nil
-		}
-
-		// Check if ImageSigningRequest has already been marked as Succeeded or Failed
-		if instance.Status.Phase == images.PhaseCompleted || instance.Status.Phase == images.PhaseFailed {
-			return reconcile.Result{}, nil
-		}
-
-		// Check to verfiy ImageSigningRequest is in phase Running
-		if instance.Status.Phase != images.PhaseRunning {
-			return reconcile.Result{}, nil
-		}
-
-		// Check if Failed
-		if pod.Status.Phase == corev1.PodFailed {
-			logrus.Infof("Signing Pod Failed. Updating ImageSiginingRequest %s", podOwnerAnnotation)
-
-			err = signing.UpdateOnImageSigningCompletionError(r.client, fmt.Sprintf("Signing Pod Failed '%v'", err), *instance)
-
-			if err != nil {
-				return reconcile.Result{}, err
-			}
-
-			return reconcile.Result{}, nil
-
-		} else if pod.Status.Phase == corev1.PodSucceeded {
-			requestImageStreamTag := &imagev1.ImageStreamTag{}
-			err := r.client.Get(context.TODO(), types.NamespacedName{Name: instance.Spec.ImageStreamTag, Namespace: instance.ObjectMeta.Namespace}, requestImageStreamTag)
-
-			if k8serrors.IsNotFound(err) {
-
-				errorMessage := fmt.Sprintf("ImageStream %s Not Found in Namespace %s", instance.Spec.ImageStreamTag, instance.Namespace)
-				logrus.Warnf(errorMessage)
-
-				err = signing.UpdateOnImageSigningCompletionError(r.client, errorMessage, *instance)
-
-				if err != nil {
-					return reconcile.Result{}, err
-				}
-
-				return reconcile.Result{}, nil
-
-			}
-
-			_, dockerImageID, err := util.ExtractImageIDFromImageReference(requestImageStreamTag.Image.DockerImageReference)
-
-			if err != nil {
-				return reconcile.Result{}, err
-			}
-
-			logrus.Infof("Signing Pod Succeeded. Updating ImageSiginingRequest %s", pod.Annotations[common.CopOwnerAnnotation])
-
-			err = signing.UpdateOnImageSigningCompletionSuccess(r.client, "Image Signed", dockerImageID, *instance)
-
-			if err != nil {
-				return reconcile.Result{}, err
-			}
-		}
-		return reconcile.Result{}, nil
 	}
+
+	return reconcile.Result{}, nil
 }

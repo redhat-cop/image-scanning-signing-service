@@ -101,7 +101,7 @@ func createSigningPod(scheme *runtime.Scheme, instance *v1alpha1.ImageSigningReq
 			Name:        ownerID,
 			Namespace:   targetProject,
 			Labels:      map[string]string{"type": "image-signing"},
-			Annotations: map[string]string{"cop.redhat.com/type": "image-signing"},
+			Annotations: map[string]string{"cop.redhat.com/owner": ownerReference, "cop.redhat.com/type": "image-signing"},
 		},
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{{
