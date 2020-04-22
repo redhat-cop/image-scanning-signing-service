@@ -1,0 +1,7 @@
+apiVersion: imagesigningrequests.cop.redhat.com/v1alpha1
+kind: ImageSigningRequest
+metadata:
+  name: example-imagesigningrequest
+spec:
+  # Add fields here
+  size: 3

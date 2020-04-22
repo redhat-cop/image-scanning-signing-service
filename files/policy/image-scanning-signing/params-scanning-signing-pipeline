@@ -1,2 +1,0 @@
-SERVICE_ACCOUNT_NAME=jenkins
-NAMESPACE=image-scanning-signing-pipeline

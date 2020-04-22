@@ -1,0 +1,76 @@
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: imagesigningrequests.imagesigningrequests.cop.redhat.com
+spec:
+  group: imagesigningrequests.cop.redhat.com
+  names:
+    kind: ImageSigningRequest
+    listKind: ImageSigningRequestList
+    plural: imagesigningrequests
+    singular: imagesigningrequest
+  scope: Namespaced
+  subresources:
+    status: {}
+  validation:
+    openAPIV3Schema:
+      description: ImageSigningRequest is the Schema for the imagesigningrequests
+        API
+      properties:
+        apiVersion:
+          description: 'APIVersion defines the versioned schema of this representation
+            of an object. Servers should convert recognized schemas to the latest
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+          type: string
+        kind:
+          description: 'Kind is a string value representing the REST resource this
+            object represents. Servers may infer this from the endpoint the client
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+          type: string
+        metadata:
+          type: object
+        spec:
+          description: ImageSigningRequestSpec defines the desired state of ImageSigningRequest
+          properties:
+            imageStreamTag:
+              type: string
+            signingKeySecretName:
+              type: string
+            signingKeySignBy:
+              type: string
+          required:
+          - imageStreamTag
+          type: object
+        status:
+          description: ImageSigningRequestStatus defines the observed state of ImageSigningRequest
+          properties:
+            conditions:
+              items:
+                properties:
+                  lastTransitionTime:
+                    type: string
+                  message:
+                    type: string
+                  status:
+                    type: string
+                  type:
+                    type: string
+                type: object
+              type: array
+            endTime:
+              type: string
+            phase:
+              type: string
+            signedImage:
+              type: string
+            startTime:
+              type: string
+            unsignedImage:
+              type: string
+          type: object
+      type: object
+  version: v1alpha1
+  versions:
+  - name: v1alpha1
+    served: true
+    storage: true
