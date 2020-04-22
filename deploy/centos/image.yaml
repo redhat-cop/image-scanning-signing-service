@@ -1,6 +1,4 @@
-apiVersion: v1
+apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
   name: centos8
-spec:
-  dockerImageRepository: docker.io/centos/centos:8

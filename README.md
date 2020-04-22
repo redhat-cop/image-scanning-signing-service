@@ -25,10 +25,11 @@ $ oc new-project image-management
 ### UBI
 ```
 $ DISTRO=ubi
+$ oc apply -f deploy/${DISTRO}/image.yaml
 ```
 Note: For UBI build to work you need to add a subscription entitlement key
 ```
-oc create secret generic etc-pki-entitlement --from-file=entitlement.pem=/path/to/pem/file/{id}.pem --from-file=entitlement-key.pem=/path/to/pem/file/{id}.pem
+oc create secret generic etc-pki-entitlement --from-file=entitlement.pem=path/to/pem/file/{id}.pem --from-file=entitlement-key.pem=path/to/pem/file/{id}.pem
 
 ```
 https://docs.openshift.com/container-platform/4.3/builds/running-entitled-builds.html#builds-source-secrets-entitlements_running-entitled-builds
@@ -37,8 +38,13 @@ https://docs.openshift.com/container-platform/4.3/builds/running-entitled-builds
 ### Centos
 ```
 $ DISTRO=centos
+$ oc apply -f deploy/${DISTRO}/image.yaml
 ```
 
+Add the latest tag to the centos8 imagestream
+```
+$ oc import-image centos8:latest --from=docker.io/centos:8 --confirm
+```
 ### Install 
 
 Add crd and resources to cluster
@@ -49,14 +55,12 @@ $ oc apply -f deploy/role.yaml
 $ oc apply -f deploy/role_binding.yaml
 $ oc apply -f deploy/scc.yaml
 $ oc apply -f deploy/secret.yaml
-$ oc apply -f deploy/${DISTRO}/image.yaml
 $ oc apply -f deploy/${DISTRO}/sign_build.yaml
 ```
 
 Build signing image (locally)
 ```
-$ cd /deploy/${DISTRO}/signing-image
-$ oc start-build image-sign-scan-base --from-dir=./ --follow
+$ oc start-build image-sign-scan-base --from-dir=./deploy/${DISTRO}/signing-image --follow
 ```
 
 Login to the cluster via the Service Account above
@@ -100,14 +104,14 @@ spec:
 
 The above example can be applied to the cluster by running
 
-``` $ oc apply -f deploy/examples/example.yaml
+``` $ oc apply -f deploy/examples/example.yaml ```
 
 The signing pod will launch in the `image-management` namespace and handle the signing of the specified image. the `ImageSigningRequest` in the `dotnet-example` namespace will be updated and contain the name of the signed image in the Status section. Confirm this by running 
 
-``` $ oc get imagesigningrequest/dotnet-example -o yaml ```
+``` $ oc get imagesigningrequest/dotnet-app -o yaml ```
 
 Finally, the newly created Image will contain the signatures associated with the signing action. This can be confirmed by running the following command:
 
 ```
-$ oc get image $(oc get imagesigningrequest dotnet-example --template='{{ .status.signedImage }}') -o yaml
+$ oc get image $(oc get imagesigningrequest dotnet-app --template='{{ .status.signedImage }}') -o yaml
 ```
