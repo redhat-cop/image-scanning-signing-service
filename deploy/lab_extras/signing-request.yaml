@@ -1,7 +1,7 @@
 apiVersion: imagesigningrequests.cop.redhat.com/v1alpha1
 kind: ImageSigningRequest
 metadata:
-  name: nginx-3
+  name: nginx-4
 spec:
   imageStreamTag: nginx:latest
 
