@@ -32,5 +32,5 @@ spec:
               value: "image-security"
             - name: SIGN_SCAN_IMAGE
               value: "quay.io/jgoldsmith/image-signer:latest"
-            - name: SIG_DEMO
+            - name: HOST_PATH_MOUNT
               value: "true"

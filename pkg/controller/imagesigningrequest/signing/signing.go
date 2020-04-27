@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"time"
+        "strings"
 
 	"github.com/redhat-cop/image-security/pkg/apis/imagesigningrequests/v1alpha1"
 	"github.com/redhat-cop/image-security/pkg/controller/config"
@@ -137,10 +138,6 @@ func createSigningPod(scheme *runtime.Scheme, instance *v1alpha1.ImageSigningReq
 				// TODO - Add the containers/sigstore volume
 				VolumeMounts: []corev1.VolumeMount{
 					{
-						Name:      "docker-socket",
-						MountPath: "/var/run/docker.sock",
-					},
-					{
 						Name:      "gpg",
 						MountPath: "/root/gpg",
 					},
@@ -149,14 +146,6 @@ func createSigningPod(scheme *runtime.Scheme, instance *v1alpha1.ImageSigningReq
 			RestartPolicy:      corev1.RestartPolicyNever,
 			ServiceAccountName: serviceAccount,
 			Volumes: []corev1.Volume{
-				{
-					Name: "docker-socket",
-					VolumeSource: corev1.VolumeSource{
-						HostPath: &corev1.HostPathVolumeSource{
-							Path: "/var/run/docker.sock",
-						},
-					},
-				},
 				{
 					Name: "gpg",
 					VolumeSource: corev1.VolumeSource{
@@ -170,9 +159,9 @@ func createSigningPod(scheme *runtime.Scheme, instance *v1alpha1.ImageSigningReq
 	}
 
 	// Begin Custom Logic to support signing
-	_, sigDemoEnvVal := os.LookupEnv("SIG_DEMO")
+	hostPathVal, hostPathBool := os.LookupEnv("HOST_PATH_MOUNT")
 
-	if sigDemoEnvVal {
+	if hostPathBool && strings.EqualFold("true", hostPathVal) {
 
 		pod.Spec.Volumes = append(pod.Spec.Volumes, corev1.Volume{
 			Name: "sigstore",
@@ -186,11 +175,6 @@ func createSigningPod(scheme *runtime.Scheme, instance *v1alpha1.ImageSigningReq
 		pod.Spec.Containers[0].VolumeMounts = append(pod.Spec.Containers[0].VolumeMounts, corev1.VolumeMount{
 			Name:      "sigstore",
 			MountPath: "/var/lib/containers/sigstore/",
-		})
-
-		pod.Spec.Containers[0].Env = append(pod.Spec.Containers[0].Env, corev1.EnvVar{
-			Name:  "PUSH_TYPE",
-			Value: "docker",
 		})
 
 		pod.Spec.NodeSelector = map[string]string{"type": "builder"}
