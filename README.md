@@ -29,7 +29,7 @@ $ oc apply -f deploy/${DISTRO}/image.yaml
 ```
 Note: For UBI build to work you need to add a subscription entitlement key
 ```
-oc create secret generic etc-pki-entitlement --from-file=entitlement.pem=path/to/pem/file/{id}.pem --from-file=entitlement-key.pem=path/to/pem/file/{id}.pem
+$ oc create secret generic etc-pki-entitlement --from-file=entitlement.pem=path/to/pem/file/{id}.pem --from-file=entitlement-key.pem=path/to/pem/file/{id}.pem
 
 ```
 https://docs.openshift.com/container-platform/4.3/builds/running-entitled-builds.html#builds-source-secrets-entitlements_running-entitled-builds
@@ -41,10 +41,6 @@ $ DISTRO=centos
 $ oc apply -f deploy/${DISTRO}/image.yaml
 ```
 
-Add the latest tag to the centos8 imagestream
-```
-$ oc import-image centos8:latest --from=docker.io/centos:8 --confirm
-```
 ### Install 
 
 Add crd and resources to cluster
@@ -58,9 +54,9 @@ $ oc apply -f deploy/secret.yaml
 $ oc apply -f deploy/${DISTRO}/sign_build.yaml
 ```
 
-Build signing image (locally)
+Build signing image
 ```
-$ oc start-build image-sign-scan-base --from-dir=./deploy/${DISTRO}/signing-image --follow
+$ oc start-build image-sign-scan-base --follow
 ```
 
 Login to the cluster via the Service Account above
