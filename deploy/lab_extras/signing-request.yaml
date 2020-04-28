@@ -1,6 +1,7 @@
 apiVersion: imagesigningrequests.cop.redhat.com/v1alpha1
 kind: ImageSigningRequest
 metadata:
-  name: dotnet-app
+  name: nginx-1
 spec:
-  imageStreamTag: dotnet-example:latest
+  imageStreamTag: nginx:latest
+
