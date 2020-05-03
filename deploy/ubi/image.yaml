@@ -3,4 +3,12 @@ kind: ImageStream
 metadata:
   name: ubi8
 spec:
-  dockerImageRepository: registry.access.redhat.com/ubi8/ubi
+  tags:
+  - annotations: null
+    from:
+      kind: DockerImage
+      name: registry.access.redhat.com/ubi8/ubi:latest
+    importPolicy: {}
+    name: latest
+    referencePolicy:
+      type: Source

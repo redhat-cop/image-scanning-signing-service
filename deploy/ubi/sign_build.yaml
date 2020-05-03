@@ -18,12 +18,15 @@ items:
         kind: ImageStreamTag
         name: image-sign-scan-base:latest
     source:
-      type: Binary
-      binary: {}
+      type: Git
+      git: 
+        uri: "https://github.com/redhat-cop/image-scanning-signing-service"
+        ref: "master"
+      contextDir: "deploy/ubi/signing-image/"
       secrets:
-        - secret:
-            name: etc-pki-entitlement
-          destinationDir: etc-pki-entitlement
+      - secret:
+          name: etc-pki-entitlement
+        destinationDir: etc-pki-entitlement
     strategy:
       dockerStrategy:
         buildArgs:

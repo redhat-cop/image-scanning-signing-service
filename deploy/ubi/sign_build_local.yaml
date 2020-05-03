@@ -18,11 +18,12 @@ items:
         kind: ImageStreamTag
         name: image-sign-scan-base:latest
     source:
-      type: Git
-      git: 
-        uri: "https://github.com/redhat-cop/image-scanning-signing-service"
-        ref: "master"
-      contextDir: "deploy/centos/signing-image/"
+      type: Binary
+      binary: {}
+      secrets:
+      - secret:
+          name: etc-pki-entitlement
+        destinationDir: etc-pki-entitlement
     strategy:
       dockerStrategy:
         buildArgs:
@@ -30,7 +31,7 @@ items:
           value: "4.3"
         from:
           kind: ImageStreamTag
-          name: centos8:latest
+          name: ubi8:latest
       type: Docker
     postCommit: {}
     triggers:

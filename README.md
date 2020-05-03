@@ -5,9 +5,32 @@ _This repository is currently undergoing active development. Functionality may b
 
 Operator to support signing of images within OCP 4.x clusters [OpenShift Container Platform](https://www.openshift.com/container-platform/index.html)
 
+## Install Operator
+
+### Create Namespace
+```
+$ oc new-project image-management
+```
+
+### Install CRD and Resources
+```
+$ oc apply -f deploy/crds/imagesigningrequests.cop.redhat.com_imagesigningrequests_crd.yaml
+$ oc apply -f deploy/service_account.yaml
+$ oc apply -f deploy/role.yaml
+$ oc apply -f deploy/role_binding.yaml
+$ oc apply -f deploy/scc.yaml
+$ oc apply -f deploy/secret.yaml
+```
+
+### Deploy 
+Apply the operator to the image-management namespace
+```
+$ oc apply -f deploy/operator.yaml
+```
+
 ## Build & Run Locally (OpenShift)
 
-Run the following steps to run the operator locally. The operator will require `cluster-admin` permissions that can be applied using the resources provided in the deploy/ folder.
+Run the following steps to run the operator locally. The operator will require `cluster-admin` permissions that can be applied using the resources provided in the deploy/ folder from the Install section above.
 
 Pull in dependences
 ```
@@ -15,23 +38,19 @@ $ export GO111MODULE=on
 $ go mod vendor
 ```
 
-Create the expected namespace
-```
-$ oc new-project image-management
-```
-
-##Select a distribution
+### Select a distribution
 
 ### UBI
 ```
 $ DISTRO=ubi
 $ oc apply -f deploy/${DISTRO}/image.yaml
 ```
-Note: For UBI build to work you need to add a subscription entitlement key
+Note: For UBI signing image build to work you need to add a subscription entitlement key
 ```
-oc create secret generic etc-pki-entitlement --from-file=entitlement.pem=path/to/pem/file/{id}.pem --from-file=entitlement-key.pem=path/to/pem/file/{id}.pem
+$ oc create secret generic etc-pki-entitlement --from-file=entitlement.pem=path/to/pem/file/{id}.pem --from-file=entitlement-key.pem=path/to/pem/file/{id}.pem
 
 ```
+*Additional reading on entitled builds*
 https://docs.openshift.com/container-platform/4.3/builds/running-entitled-builds.html#builds-source-secrets-entitlements_running-entitled-builds
 
 
@@ -41,35 +60,27 @@ $ DISTRO=centos
 $ oc apply -f deploy/${DISTRO}/image.yaml
 ```
 
-Add the latest tag to the centos8 imagestream
+### Build Signing Image GIT
+Build signing image from remote GIT repository
 ```
-$ oc import-image centos8:latest --from=docker.io/centos:8 --confirm
-```
-### Install 
-
-Add crd and resources to cluster
-```
-$ oc apply -f deploy/crds/imagesigningrequests.cop.redhat.com_imagesigningrequests_crd.yaml
-$ oc apply -f deploy/service_account.yaml
-$ oc apply -f deploy/role.yaml
-$ oc apply -f deploy/role_binding.yaml
-$ oc apply -f deploy/scc.yaml
-$ oc apply -f deploy/secret.yaml
 $ oc apply -f deploy/${DISTRO}/sign_build.yaml
+$ oc start-build image-sign-scan-base --follow
 ```
 
-Build signing image (locally)
+### Build Signing Image Locally
+Build signing image locally 
 ```
+$ oc apply -f deploy/${DISTRO}/sign_build_local.yaml
 $ oc start-build image-sign-scan-base --from-dir=./deploy/${DISTRO}/signing-image --follow
 ```
 
+### Run Operator-SDK
 Login to the cluster via the Service Account above
 ```
 $ TOKEN=$(oc sa get-token imagemanager)
 $ oc login --token="${TOKEN}"
 ```
-
-Run Operator-SDK
+Run the operator locally
 ```
 $ operator-sdk run --local --namespace="image-management" 
 ```
