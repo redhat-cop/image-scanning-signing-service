@@ -32,6 +32,6 @@ if [ "$REGISTRY_CONTENTS" != "null" ]; then
   podman login --tls-verify=false -u $USERNAME -p $PASSWORD $REGISTRY_HOST
 fi
 
-podman pull $IMAGE --creds $USERNAME:$PASSWORD --tls-verify=false
+podman pull $IMAGE --tls-verify=false
 podman image sign --sign-by $SIGNBY -d /var/lib/containers/sigstore containers-storage:$IMAGE
 podman rmi -f $IMAGE

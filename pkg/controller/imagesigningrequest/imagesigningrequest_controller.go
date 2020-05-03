@@ -107,7 +107,6 @@ func (r *ReconcileImageSigningRequest) Reconcile(request reconcile.Request) (rec
 	imageSigningRequestMetadataKey, _ := cache.MetaNamespaceKeyFunc(instance)
 	emptyPhase := imagesigningrequestsv1alpha1.ImageSigningRequestStatus{}.Phase
 	if instance.Status.Phase == emptyPhase {
-		_, requestIsTag := util.ParseImageStreamTag(instance.Spec.ImageStreamTag)
 
 		//requestImageStreamTag := &imagev1.ImageStreamTag{}
 		//err := r.client.Get(context.TODO(), types.NamespacedName{Name: instance.Spec.ImageStreamTag, Namespace: instance.ObjectMeta.Namespace}, requestImageStreamTag)
@@ -204,7 +203,7 @@ func (r *ReconcileImageSigningRequest) Reconcile(request reconcile.Request) (rec
 				}
 
 			}
-			signingPodName, err := signing.LaunchSigningPod(r.client, r.scheme, r.config, instance, fmt.Sprintf("%s:%s", dockerImageRegistry, requestIsTag), dockerImageID, string(instance.ObjectMeta.UID), imageSigningRequestMetadataKey, gpgSecretName, gpgSignBy)
+			signingPodName, err := signing.LaunchSigningPod(r.client, r.scheme, r.config, instance, fmt.Sprintf("%s@%s", dockerImageRegistry, dockerImageID), dockerImageID, string(instance.ObjectMeta.UID), imageSigningRequestMetadataKey, gpgSecretName, gpgSignBy)
 
 			if err != nil {
 				errorMessage := fmt.Sprintf("Error Occurred Creating Signing Pod '%v'", err)
