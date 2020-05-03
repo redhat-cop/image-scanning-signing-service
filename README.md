@@ -45,11 +45,12 @@ $ go mod vendor
 $ DISTRO=ubi
 $ oc apply -f deploy/${DISTRO}/image.yaml
 ```
-Note: For UBI build to work you need to add a subscription entitlement key
+Note: For UBI signing image build to work you need to add a subscription entitlement key
 ```
 $ oc create secret generic etc-pki-entitlement --from-file=entitlement.pem=path/to/pem/file/{id}.pem --from-file=entitlement-key.pem=path/to/pem/file/{id}.pem
 
 ```
+*Additional reading on entitled builds*
 https://docs.openshift.com/container-platform/4.3/builds/running-entitled-builds.html#builds-source-secrets-entitlements_running-entitled-builds
 
 
