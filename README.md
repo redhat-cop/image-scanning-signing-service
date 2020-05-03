@@ -24,7 +24,9 @@ $ oc apply -f deploy/secret.yaml
 
 ### Deploy 
 Apply the operator to the image-management namespace
-```$ oc apply -f deploy/operator.yaml```
+```
+$ oc apply -f deploy/operator.yaml
+```
 
 ## Build & Run Locally (OpenShift)
 
