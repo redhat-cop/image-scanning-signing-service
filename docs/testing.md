@@ -8,6 +8,5 @@ There is a local centos based E2E test under the scripts folder. This will setup
 > :warning: **Apply Global Resources**: Applying the global SCC and CRD resources shown in the [install](../README.md) section of the readme is required before running this test
 
 ```
-# Make sure to run this from the root project folder
 $ sh ./scripts/centos-e2e-test.sh
 ```
