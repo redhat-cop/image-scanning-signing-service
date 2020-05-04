@@ -70,6 +70,6 @@ Finally, the newly created Image will contain the signatures associated with the
 $ oc get image $(oc get imagesigningrequest dotnet-app --template='{{ .status.signedImage }}') -o yaml
 ```
 
-## Contribute
-### [Development](development.md)
-### [Testing](testing.md)
+## Development
+### [How-To](docs/development.md)
+### [Testing](docs/testing.md)
