@@ -53,6 +53,9 @@ Login to the cluster via the Service Account above
 $ TOKEN=$(oc sa get-token imagemanager)
 $ oc login --token="${TOKEN}"
 ```
+
+> :warning: **Apply Resources**: Being logged into an OCP instance and having installed the needed resources shown in the [Install Operator](../README.md#install-operator) section of the README are required before running this test.
+
 Run the operator locally
 ```
 $ operator-sdk run --local --namespace="image-management" 
