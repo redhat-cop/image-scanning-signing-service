@@ -203,7 +203,7 @@ func (r *ReconcileImageSigningRequest) Reconcile(request reconcile.Request) (rec
 				}
 
 			}
-			signingPodName, err := signing.LaunchSigningPod(r.client, r.scheme, r.config, instance, fmt.Sprintf("%s@%s", dockerImageRegistry, dockerImageID), dockerImageID, string(instance.ObjectMeta.UID), imageSigningRequestMetadataKey, gpgSecretName, gpgSignBy, namespace)
+			signingPodName, err := signing.LaunchSigningPod(r.client, r.scheme, r.config, instance, fmt.Sprintf("%s@%s", dockerImageRegistry, dockerImageID), dockerImageID, string(instance.ObjectMeta.UID), imageSigningRequestMetadataKey, gpgSecretName, gpgSignBy)
 
 			if err != nil {
 				errorMessage := fmt.Sprintf("Error Occurred Creating Signing Pod '%v'", err)
