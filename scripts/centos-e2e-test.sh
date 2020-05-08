@@ -1,4 +1,4 @@
-# 
+#!/bin/bash
 # Run from projects root folder
 
 # NOTE: You must have have run the following oc command for this to work. It is not automated 
