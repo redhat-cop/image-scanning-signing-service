@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: image-security
+  namespace: image-management-test
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: image-security
+  template:
+    metadata:
+      labels:
+        name: image-security
+    spec:
+      serviceAccountName: imagemanager
+      containers:
+        - name: image-security
+          image: quay.io/cnuland/image-signing-operator
+          command:
+          - image-security
+          imagePullPolicy: Always
+          env:
+            - name: WATCH_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: OPERATOR_NAME
+              value: "image-security"
+            - name: SIGN_SCAN_IMAGE
+              value: "quay.io/cnuland/image-signing-centos8"
+            - name: TARGET_PROJECT
+              value: "image-management-test"

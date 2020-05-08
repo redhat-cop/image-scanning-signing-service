@@ -42,5 +42,6 @@ users:
 - system:serviceaccount:management-infra:management-admin
 - system:serviceaccount:management-infra:inspector-admin
 - system:serviceaccount:image-management:imagemanager
+- system:serviceaccount:image-management-test:imagemanager
 volumes:
 - '*'

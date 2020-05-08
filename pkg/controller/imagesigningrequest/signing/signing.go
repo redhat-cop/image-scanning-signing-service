@@ -3,8 +3,8 @@ package signing
 import (
 	"context"
 	"os"
+	"strings"
 	"time"
-        "strings"
 
 	"github.com/redhat-cop/image-security/pkg/apis/imagesigningrequests/v1alpha1"
 	"github.com/redhat-cop/image-security/pkg/controller/config"
