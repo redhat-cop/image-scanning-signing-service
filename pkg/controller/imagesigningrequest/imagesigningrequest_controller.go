@@ -8,12 +8,10 @@ import (
 	imagesigningrequestsv1alpha1 "github.com/redhat-cop/image-security/pkg/apis/imagesigningrequests/v1alpha1"
 	"github.com/redhat-cop/image-security/pkg/controller/config"
 	"github.com/redhat-cop/image-security/pkg/controller/imagesigningrequest/signing"
-	"github.com/redhat-cop/image-security/pkg/controller/util"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/cache"
@@ -110,106 +108,32 @@ func (r *ReconcileImageSigningRequest) Reconcile(request reconcile.Request) (rec
 
 		//requestImageStreamTag := &imagev1.ImageStreamTag{}
 		//err := r.client.Get(context.TODO(), types.NamespacedName{Name: instance.Spec.ImageStreamTag, Namespace: instance.ObjectMeta.Namespace}, requestImageStreamTag)
-		requestImageStreamTag, err := r.imageClient.ImageStreamTags(instance.ObjectMeta.Namespace).Get(instance.Spec.ImageStreamTag, metav1.GetOptions{})
+		//requestImageStreamTag, err := r.imageClient.ImageStreamTags(instance.ObjectMeta.Namespace).Get(instance.Spec.ImageStreamTag, metav1.GetOptions{})
 		instance.Status.EndTime = time.Time{}.String() // Need an initial value since time is not nullable
 		instance.Status.StartTime = time.Time{}.String()
 
-		if err != nil {
-
-			errorMessage := ""
-
-			if k8serrors.IsNotFound(err) {
-				errorMessage = fmt.Sprintf("ImageStreamTag %s Not Found in Namespace %s", instance.Spec.ImageStreamTag, instance.Namespace)
-			} else {
-				errorMessage = fmt.Sprintf("Error retrieving ImageStreamTag: %v", err)
-			}
-
-			logrus.Warnf(errorMessage)
-			err = signing.UpdateOnImageSigningInitializationFailure(r.client, errorMessage, *instance)
-
-			if err != nil {
-				return reconcile.Result{}, err
-			}
-
-			return reconcile.Result{}, nil
-
-		}
-
-		dockerImageRegistry, dockerImageID, err := util.ExtractImageIDFromImageReference(requestImageStreamTag.Image.DockerImageReference)
+		imageUrl, imageID, err := signing.GetImageLocationFromRequest(r.imageClient, instance.Spec.ContainerImage, instance.ObjectMeta.Namespace)
 
 		if err != nil {
 			return reconcile.Result{}, err
 		}
-		// TODO - Need to validate this for OCP 4.x
-		if requestImageStreamTag.Image.Signatures != nil {
-			errorMessage := fmt.Sprintf("Signatures Exist on Image '%s'", dockerImageID)
 
-			logrus.Warnf(errorMessage)
+		logrus.Infof("No Signatures Exist on Image '%s'", imageID)
 
-			err = signing.UpdateOnImageSigningInitializationFailure(r.client, errorMessage, *instance)
+		// Setup default values
+		gpgSecretName := r.config.GpgSecret
+		gpgSignBy := r.config.GpgSignBy
 
-			if err != nil {
-				return reconcile.Result{}, err
-			}
+		// Check if Secret if found
+		if instance.Spec.SigningKeySecretName != "" {
 
-			return reconcile.Result{}, nil
+			signingKeySecret := &corev1.Secret{}
+			err := r.client.Get(context.TODO(), types.NamespacedName{Name: instance.Spec.SigningKeySecretName, Namespace: instance.Namespace}, signingKeySecret)
 
-		} else {
-			logrus.Infof("No Signatures Exist on Image '%s'", dockerImageID)
+			if k8serrors.IsNotFound(err) {
 
-			// Setup default values
-			gpgSecretName := r.config.GpgSecret
-			gpgSignBy := r.config.GpgSignBy
-
-			// Check if Secret if found
-			if instance.Spec.SigningKeySecretName != "" {
-
-				signingKeySecret := &corev1.Secret{}
-				err := r.client.Get(context.TODO(), types.NamespacedName{Name: instance.Spec.SigningKeySecretName, Namespace: instance.Namespace}, signingKeySecret)
-
-				if k8serrors.IsNotFound(err) {
-
-					errorMessage := fmt.Sprintf("GPG Secret '%s' Not Found in Namespace '%s'", instance.Spec.SigningKeySecretName, instance.Namespace)
-					logrus.Warnf(errorMessage)
-					err = signing.UpdateOnImageSigningInitializationFailure(r.client, errorMessage, *instance)
-
-					if err != nil {
-						return reconcile.Result{}, err
-					}
-
-					return reconcile.Result{}, nil
-				}
-
-				logrus.Infof("Copying Secret '%s' to Project '%s'", instance.Spec.SigningKeySecretName, r.config.TargetProject)
-				// Create a copy
-				signingKeySecretCopy := signingKeySecret.DeepCopy()
-				signingKeySecretCopy.Name = string(instance.ObjectMeta.UID)
-				signingKeySecretCopy.Namespace = r.config.TargetProject
-				signingKeySecretCopy.ResourceVersion = ""
-				signingKeySecretCopy.UID = ""
-
-				err = r.client.Create(context.TODO(), signingKeySecretCopy)
-
-				if k8serrors.IsAlreadyExists(err) {
-					logrus.Info("Secret already exists. Updating...")
-					err = r.client.Update(context.TODO(), signingKeySecretCopy)
-
-				}
-
-				gpgSecretName = signingKeySecretCopy.Name
-
-				if instance.Spec.SigningKeySignBy != "" {
-					gpgSignBy = instance.Spec.SigningKeySignBy
-				}
-
-			}
-			signingPodName, err := signing.LaunchSigningPod(r.client, r.scheme, r.config, instance, fmt.Sprintf("%s@%s", dockerImageRegistry, dockerImageID), dockerImageID, string(instance.ObjectMeta.UID), imageSigningRequestMetadataKey, gpgSecretName, gpgSignBy)
-
-			if err != nil {
-				errorMessage := fmt.Sprintf("Error Occurred Creating Signing Pod '%v'", err)
-
-				logrus.Errorf(errorMessage)
-
+				errorMessage := fmt.Sprintf("GPG Secret '%s' Not Found in Namespace '%s'", instance.Spec.SigningKeySecretName, instance.Namespace)
+				logrus.Warnf(errorMessage)
 				err = signing.UpdateOnImageSigningInitializationFailure(r.client, errorMessage, *instance)
 
 				if err != nil {
@@ -219,15 +143,53 @@ func (r *ReconcileImageSigningRequest) Reconcile(request reconcile.Request) (rec
 				return reconcile.Result{}, nil
 			}
 
-			logrus.Infof("Signing Pod Launched '%s'", signingPodName)
+			logrus.Infof("Copying Secret '%s' to Project '%s'", instance.Spec.SigningKeySecretName, r.config.TargetProject)
+			// Create a copy
+			signingKeySecretCopy := signingKeySecret.DeepCopy()
+			signingKeySecretCopy.Name = string(instance.ObjectMeta.UID)
+			signingKeySecretCopy.Namespace = r.config.TargetProject
+			signingKeySecretCopy.ResourceVersion = ""
+			signingKeySecretCopy.UID = ""
 
-			err = signing.UpdateOnSigningPodLaunch(r.client, fmt.Sprintf("Signing Pod Launched '%s'", signingPodName), dockerImageID, *instance)
+			err = r.client.Create(context.TODO(), signingKeySecretCopy)
+
+			if k8serrors.IsAlreadyExists(err) {
+				logrus.Info("Secret already exists. Updating...")
+				err = r.client.Update(context.TODO(), signingKeySecretCopy)
+
+			}
+
+			gpgSecretName = signingKeySecretCopy.Name
+
+			if instance.Spec.SigningKeySignBy != "" {
+				gpgSignBy = instance.Spec.SigningKeySignBy
+			}
+
+		}
+		signingPodName, err := signing.LaunchSigningPod(r.client, r.scheme, r.config, instance, imageUrl, imageID, string(instance.ObjectMeta.UID), imageSigningRequestMetadataKey, gpgSecretName, gpgSignBy)
+
+		if err != nil {
+			errorMessage := fmt.Sprintf("Error Occurred Creating Signing Pod '%v'", err)
+
+			logrus.Errorf(errorMessage)
+
+			err = signing.UpdateOnImageSigningInitializationFailure(r.client, errorMessage, *instance)
 
 			if err != nil {
 				return reconcile.Result{}, err
 			}
 
+			return reconcile.Result{}, nil
 		}
+
+		logrus.Infof("Signing Pod Launched '%s'", signingPodName)
+
+		err = signing.UpdateOnSigningPodLaunch(r.client, fmt.Sprintf("Signing Pod Launched '%s'", signingPodName), imageID, *instance)
+
+		if err != nil {
+			return reconcile.Result{}, err
+		}
+
 	}
 
 	return reconcile.Result{}, nil
