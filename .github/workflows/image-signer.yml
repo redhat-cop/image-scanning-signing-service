@@ -1,0 +1,25 @@
+name: image-signer
+on:
+  push:
+    paths:
+      - "deploy/centos/signing-image/**"
+  pull_request:
+    paths:
+      - "deploy/centos/signing-image/**"
+jobs:
+  build_push:
+    name: "Singing Image"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v2
+      - name: "Build and Push Image"
+        uses: docker/build-push-action@v1
+        with:
+          path: deploy/centos/signing-image
+          username: ${{ secrets.SIGNER_REGISTRY_USERNAME }}
+          password: ${{ secrets.SIGNER_REGISTRY_PASSWORD }}
+          registry: ${{ secrets.SIGNER_REGISTRY_SERVER }}
+          repository: ${{ secrets.SIGNER_REGISTRY_REPOSITORY }}
+          push: ${{ github.ref == 'refs/heads/master' && secrets.SIGNER_REGISTRY_PUSH == 'true'  }}
+          tags: latest
