@@ -2,16 +2,17 @@ package v1alpha1
 
 import (
 	images "github.com/redhat-cop/image-security/pkg/controller/images"
+	kapi "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	kapi "k8s.io/kubernetes/pkg/apis/core"
 )
 
 // ImageSigningRequestSpec defines the desired state of ImageSigningRequest
 // +k8s:openapi-gen=true
 type ImageSigningRequestSpec struct {
-	ContainerImage       *kapi.ObjectReference `json:"containerImage", casttype=k8s.io/kubernetes/pkg/api/v1.ObjectReference""`
-	SigningKeySecretName string                `json:"signingKeySecretName,omitempty"`
-	SigningKeySignBy     string                `json:"signingKeySignBy,omitempty"`
+	ContainerImage       *kapi.ObjectReference      `json:"containerImage"`
+	PullSecret           *kapi.LocalObjectReference `json:"pullSecret,omitempty"`
+	SigningKeySecretName string                     `json:"signingKeySecretName,omitempty"`
+	SigningKeySignBy     string                     `json:"signingKeySignBy,omitempty"`
 }
 
 // ImageSigningRequestStatus defines the observed state of ImageSigningRequest

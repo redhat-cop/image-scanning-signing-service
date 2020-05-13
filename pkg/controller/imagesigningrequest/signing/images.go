@@ -5,8 +5,8 @@ import (
 	"strings"
 
 	imageset "github.com/openshift/client-go/image/clientset/versioned/typed/image/v1"
+	kapi "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	kapi "k8s.io/kubernetes/pkg/apis/core"
 )
 
 func GetImageLocationFromRequest(client *imageset.ImageV1Client, image *kapi.ObjectReference, namespace string) (string, string, error) {

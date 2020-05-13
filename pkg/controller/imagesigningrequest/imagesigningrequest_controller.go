@@ -166,7 +166,14 @@ func (r *ReconcileImageSigningRequest) Reconcile(request reconcile.Request) (rec
 			}
 
 		}
-		signingPodName, err := signing.LaunchSigningPod(r.client, r.scheme, r.config, instance, imageUrl, imageID, string(instance.ObjectMeta.UID), imageSigningRequestMetadataKey, gpgSecretName, gpgSignBy)
+		// Retrieve push secret if available
+		pushSecret := ""
+		if instance.Spec.PullSecret != nil {
+			pushSecret = instance.Spec.PullSecret.Name
+
+		}
+
+		signingPodName, err := signing.LaunchSigningPod(r.client, r.scheme, r.config, instance, imageUrl, imageID, string(instance.ObjectMeta.UID), imageSigningRequestMetadataKey, gpgSecretName, gpgSignBy, pushSecret)
 
 		if err != nil {
 			errorMessage := fmt.Sprintf("Error Occurred Creating Signing Pod '%v'", err)
