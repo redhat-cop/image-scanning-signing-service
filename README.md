@@ -3,8 +3,6 @@ Image Signing Operator
 
 _This repository is currently undergoing active development. Functionality may be in flux_
 
-Operator to support signing of images within OCP 4.x clusters [OpenShift Container Platform](https://www.openshift.com/container-platform/index.html)
-
 ## Install Operator
 
 ### Create Namespace
@@ -26,6 +24,77 @@ $ oc apply -f deploy/secret.yaml
 Apply the operator to the image-management namespace
 ```
 $ oc apply -f deploy/operator.yaml
+```
+
+## Registry Types
+This operator supports a wide range of registry types when declaring an image to sign. The type and location of the image to sign are found within the `containerImage` attribute of the `ImageSigningRequest` CR.
+
+### Container Repository
+Traditional format for utalizing a remote container, either by specifying a tag or digest. These are of kind `ContainerRepository` under the `containerImage` attribute.
+
+#### Tag
+```
+containerImage:
+  kind: ContainerRepository
+  name: quay.io/redhat-cop/image-scanning-signing-service:latest
+```
+#### Digest
+```
+containerImage:
+  kind: ContainerRepository
+  name: quay.io/redhat-cop/image-scanning-signing-service&sha256:a47ae897b964f1e543452c31a24bbd3d46ed5830f4a6d9992be97d0ce61ceb6b
+```
+
+### ImageStreamTag (OpenShift)
+Sepcify an OCP `ImageStream` along with the corresponding tag of the desired image to sign. These are of kind `ImageStreamTag` under the `containerImage` attribute.
+
+```
+containerImage:
+  kind: ImageStreamTag
+  name: image-scanning-signing-service:latest
+```
+
+### ImageStreamTag (OpenShift)
+Sepcify an OCP `ImageStream` along with the corresponding digest of the desired image to sign. These are of kind `ImageStreamImage` under the `containerImage` attribute.
+
+```
+containerImage:
+  kind: ImageStreamImage
+  name: image-scanning-signing-service@sha256:763683295a9cc2b0e03ae7a415fce417fca5388935ba74e2b5d9d4e9b6ca6178
+```
+
+## Pull Secrets
+A pull secret can be included in the `ImageSigningRequest` for when needing to access a private repository to sign images.
+
+```
+spec:
+  containerImage:
+    kind: ContainerRepository
+    name: quay.io/redhat-cop/image-scanning-signing-service:latest
+  pullSecret
+    name: quay
+```
+
+### Creating Pull Secret (OpenShift)
+There are two options to create the secret needed for accessing a private repository.
+
+#### Existing Docker Config File
+If using docker login locally you can use your existing config.json file to create a secret with your tokens needed for remote login. 
+
+> :warning: **Security Risk**: This will upload the tokens for all remote repositories that you have logged into locally.
+
+```
+ oc secrets new <pull_secret_name> \
+     .dockerconfigjson=path/to/.docker/config.json
+```
+
+#### Existing Docker Config File
+Create a new secret by including your repository's credentials within the oc cli secrets command.
+
+```
+oc secrets new-dockercfg <pull_secret_name> \
+    --docker-server=<registry_server> --docker-username=<user_name> \
+    --docker-password=<password> --docker-email=<email>
 ```
 
 ## Example Workflow (OpenShift)
@@ -53,12 +122,14 @@ kind: ImageSigningRequest
 metadata:
   name: dotnet-app
 spec:
-  imageStreamTag: dotnet-example:latest
+  containerImage:
+    kind: ImageStreamTag
+    name: dotnet-example:latest
 ```
 
 The above example can be applied to the cluster by running
 
-``` $ oc apply -f deploy/examples/example.yaml ```
+``` $ oc apply -f deploy/examples/imagestreamtag.yaml ```
 
 The signing pod will launch in the `image-management` namespace and handle the signing of the specified image. the `ImageSigningRequest` in the `dotnet-example` namespace will be updated and contain the name of the signed image in the Status section. Confirm this by running 
 

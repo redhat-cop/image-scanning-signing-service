@@ -31,4 +31,4 @@ spec:
             - name: OPERATOR_NAME
               value: "image-security"
             - name: SIGN_SCAN_IMAGE
-              value: "quay.io/cnuland/image-signing-centos8"
+              value: "quay.io/redhat-cop/image-scanning-signing-service:latest"

@@ -18,14 +18,14 @@ oc rollout status deployment image-security --watch
 
 # Create namespace that will hold the image to be signed
 # The E2E test will fail if this namespace and image are not present on the system
-oc new-project dotnet-example
+oc new-project signing-test
 oc new-app --template=dotnet-example
 # Wait till the image is availble before testing against it
 oc rollout status deploymentconfig dotnet-example --watch
 
 # Run the E2E test
-operator-sdk test local ./test/e2e --namespace "image-management-test" --no-setup
+operator-sdk test local ./test/e2e/centos --namespace "image-management-test" --no-setup
 
 # Remove testing namespaces
-oc delete project/dotnet-example
+oc delete project/signing-test
 oc delete project/image-management-test

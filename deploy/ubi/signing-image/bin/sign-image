@@ -8,7 +8,6 @@ if [ "${IMAGE_SIGNATURE_EXISTS}" == "true" ]; then
   exit 0
 fi
 
-
 if [ "$SECRET" == "" ]; then
   SA_FULLNAME=$(oc whoami)
   SA_NAME="${SA_FULLNAME##*:}"
@@ -28,8 +27,22 @@ fi
 REGISTRY_HOST=${IMAGE%%/*}
 REGISTRY_CONTENTS=$(echo "$DOCKERCFG" | jq -r ". | .[\"$REGISTRY_HOST\"]")
 
+# If null then check if a registry token exists in the array of keys
+# Ignore if there is no secret for a remote registry
+if [ "$REGISTRY_CONTENTS" == "null" && "$SECRET" != ""]; then 
+  REGISTRY_CONTENTS=$(echo "$DOCKERCFG" | jq -r ". | .auths? | .[\"$REGISTRY_HOST\"]".auth | base64 -d)
+  # If the above isnt null now then cut the registry contents
+  if [ "$REGISTRY_CONTENTS" != "null" ]; then 
+    USERNAME=$(echo $REGISTRY_CONTENTS | cut -d ":" -f 1)
+    PASSWORD=$(echo $REGISTRY_CONTENTS | cut -d ":" -f 2)
+    USERNAME_PARAM="--username $USERNAME"
+    PASSWORD_PARAM="--password $PASSWORD"
+    podman login --tls-verify=false -u $USERNAME -p $PASSWORD $REGISTRY_HOST
+  fi
+fi
+
 if [ "$REGISTRY_CONTENTS" != "null" ]; then
-  USERNAME=$(echo $REGISTRY_CONTENTS | jq -r .username)
+  USERNAME=$(echo $REGISTRY_CONTENTS | jq -r .username) 
   PASSWORD=$(echo $REGISTRY_CONTENTS | jq -r .password)
   USERNAME_PARAM="--username $USERNAME"
   PASSWORD_PARAM="--password $PASSWORD"

@@ -18,14 +18,15 @@ import (
 )
 
 var (
-	retryInterval        = time.Second * 30
-	timeout              = time.Second * 600
-	statusTimeout        = time.Second * 600
-	cleanupRetryInterval = time.Second * 1
-	cleanupTimeout       = time.Second * 5
-	name                 = "dotnet-app"
-	imageNamespace       = "dotnet-example" // Namespace that the image to scan exists in
-	centosImage          = "quay.io/cnuland/image-signing-centos8"
+	RetryInterval        = time.Second * 30
+	Timeout              = time.Second * 600
+	StatusTimeout        = time.Second * 600
+	CleanupRetryInterval = time.Second * 1
+	CleanupTimeout       = time.Second * 5
+	CentosTagName        = "dotnet-app"
+	SigningRemoteName    = "signing-app"
+	ImageNamespace       = "signing-test" // Namespace that the image to scan exists in
+	CentosImage          = "quay.io/cnuland/image-signing-centos8"
 )
 
 // Original Source https://github.com/jaegertracing/jaeger-operator/blob/master/test/e2e/utils.go
@@ -39,7 +40,6 @@ func GetPod(namespace, key, value, containsImage string, kubeclient kubernetes.I
 			for _, pod := range pods.Items {
 				//if strings.HasPrefix(pod.Name, namePrefix) {
 				for _, c := range pod.Spec.Containers {
-					fmt.Printf("Found pod +%v\n", c)
 					if strings.Contains(c.Image, containsImage) {
 						return pod
 					}
@@ -58,7 +58,7 @@ func WaitForPodWithImageCompleted(t *testing.T, f *framework.Framework, ctx *fra
 		pod := GetPod(namespace, key, value, image, f.KubeClient)
 		if err != nil {
 			if apierrors.IsNotFound(err) {
-				fmt.Printf("Waiting for availability of %s pod\n", name)
+				fmt.Printf("Waiting for availability of pod\n")
 				return false, nil
 			}
 			return false, err
@@ -66,7 +66,7 @@ func WaitForPodWithImageCompleted(t *testing.T, f *framework.Framework, ctx *fra
 		if pod.Status.Phase == "Succeeded" {
 			return true, nil
 		}
-		fmt.Printf("Waiting for full completion of %s pod\n", name)
+		fmt.Printf("Waiting for full completion of pod\n")
 		return false, nil
 	})
 	if err != nil {
@@ -86,7 +86,7 @@ func AddToFrameworkSchemeForTests(t *testing.T, ctx *framework.TestCtx) {
 			APIVersion: "imagesigningrequests.cop.redhat.com/v1alpha1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
+			Name:      CentosTagName,
 			Namespace: namespace,
 		},
 		Spec:   imagesigningrequestsv1alpha1.ImageSigningRequestSpec{},

@@ -28,7 +28,8 @@ REGISTRY_HOST=${IMAGE%%/*}
 REGISTRY_CONTENTS=$(echo "$DOCKERCFG" | jq -r ". | .[\"$REGISTRY_HOST\"]")
 
 # If null then check if a registry token exists in the array of keys
-if [ "$REGISTRY_CONTENTS" == "null" ]; then 
+# Ignore if there is no secret for a remote registry
+if [ "$REGISTRY_CONTENTS" == "null" && "$SECRET" != ""]; then 
   REGISTRY_CONTENTS=$(echo "$DOCKERCFG" | jq -r ". | .auths? | .[\"$REGISTRY_HOST\"]".auth | base64 -d)
   # If the above isnt null now then cut the registry contents
   if [ "$REGISTRY_CONTENTS" != "null" ]; then 

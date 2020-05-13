@@ -35,10 +35,22 @@ func GetImageLocationFromRequest(client *imageset.ImageV1Client, image *kapi.Obj
 		return requestImageStreamTag.Image.DockerImageReference, dockerImageComponents[1], nil
 
 	}
-	if image != nil && (image.Kind == "DockerImage") {
-		dockerImageComponents := strings.Split(image.Name, ":")
+	if image != nil && (image.Kind == "ContainerRepository") {
+		// Check if its in digest form
+		dockerImageComponents := strings.Split(image.Name, "@")
+		if len(dockerImageComponents) > 1 {
+			SHAComponents := strings.Split(image.Name, ":")
+			if len(SHAComponents) > 1 {
+				return image.Name, SHAComponents[1], nil
+			}
+		}
+		// Check if its in tag form
+		dockerImageComponents = strings.Split(image.Name, ":")
+		if len(dockerImageComponents) > 1 {
 
-		return image.Name, dockerImageComponents[0], nil
+			return image.Name, dockerImageComponents[0], nil
+		}
+
 	}
 
 	return "", "", errors.New("Unexpected Image Reference")
