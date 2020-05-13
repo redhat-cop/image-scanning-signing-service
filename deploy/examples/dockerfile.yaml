@@ -1,0 +1,10 @@
+apiVersion: imagesigningrequests.cop.redhat.com/v1alpha1
+kind: ImageSigningRequest
+metadata:
+  name: dotnet-app
+spec:
+  containerImage:
+    kind: DockerImage
+    name: quay.io/cnuland/hello-openshift
+  pullSecret:
+      name: "quay"
