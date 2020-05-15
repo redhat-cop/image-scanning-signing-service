@@ -9,11 +9,9 @@ import (
 	"github.com/redhat-cop/image-security/pkg/controller/common"
 	"github.com/redhat-cop/image-security/pkg/controller/images"
 	"github.com/redhat-cop/image-security/pkg/controller/imagesigningrequest/signing"
-	"github.com/redhat-cop/image-security/pkg/controller/util"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -158,25 +156,8 @@ func (r *ReconcilePod) Reconcile(request reconcile.Request) (reconcile.Result, e
 		return reconcile.Result{}, nil
 
 	} else if pod.Status.Phase == corev1.PodSucceeded {
-		requestImageStreamTag, err := r.imageClient.ImageStreamTags(imageSigningRequest.ObjectMeta.Namespace).Get(imageSigningRequest.Spec.ImageStreamTag, metav1.GetOptions{})
 
-		if k8serrors.IsNotFound(err) {
-
-			errorMessage := fmt.Sprintf("ImageStream %s Not Found in Namespace %s", imageSigningRequest.Spec.ImageStreamTag, imageSigningRequest.Namespace)
-			logrus.Warnf(errorMessage)
-
-			err = signing.UpdateOnImageSigningCompletionError(r.client, errorMessage, *imageSigningRequest)
-
-			if err != nil {
-				return reconcile.Result{}, err
-			}
-
-			return reconcile.Result{}, nil
-
-		}
-
-		_, dockerImageID, err := util.ExtractImageIDFromImageReference(requestImageStreamTag.Image.DockerImageReference)
-
+		dockerImageID := imageSigningRequest.Status.UnsignedImage
 		if err != nil {
 			return reconcile.Result{}, err
 		}
