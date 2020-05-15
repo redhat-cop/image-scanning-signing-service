@@ -16,7 +16,15 @@ if [ "$SECRET" == "" ]; then
   DOCKERCFG_SECRET_NAME=$(echo "${SA_JSON}" | jq -r ".imagePullSecrets[] | select( .name | contains(\"${SA_NAME}-dockercfg\")).name")
   DOCKERCFG=$(oc get secret -n $NAMESPACE $DOCKERCFG_SECRET_NAME -o json | jq -r ".data[] | select(\".dockercfg\")" | base64 -d)
 else
-  DOCKERCFG=$(oc get secret -n $SECRET_NAMESPACE $SECRET -o json | jq -r ".data[] | select(\".dockercfg\")" | base64 -d)
+  TYPE=$(oc get secret -n $SECRET_NAMESPACE $SECRET -o json | jq -r ". | .[\"type\"]")
+  if [ "$TYPE" == "kubernetes.io/dockerconfigjson" ]; then
+    DOCKERCFG=$(oc get secret -n $SECRET_NAMESPACE $SECRET -o json | jq -r ".data[] | select(\".dockerconfigjson\")" | base64 -d)
+  elif [ "$TYPE" == "kubernetes.io/dockercfg" ]; then
+    DOCKERCFG=$(oc get secret -n $SECRET_NAMESPACE $SECRET -o json | jq -r ".data[] | select(\".dockercfg\")" | base64 -d)
+  else
+    echo "Invalid pull secret format"
+    exit 1
+  fi
 fi
 
 if [ -z ${IMAGE} ]; then
@@ -25,23 +33,32 @@ if [ -z ${IMAGE} ]; then
 fi
 
 REGISTRY_HOST=${IMAGE%%/*}
-REGISTRY_CONTENTS=$(echo "$DOCKERCFG" | jq -r ". | .[\"$REGISTRY_HOST\"]")
 
-# If null then check if a registry token exists in the array of keys
-# Ignore if there is no secret for a remote registry
-if [ "$REGISTRY_CONTENTS" == "null" && "$SECRET" != ""]; then 
-  REGISTRY_CONTENTS=$(echo "$DOCKERCFG" | jq -r ". | .auths? | .[\"$REGISTRY_HOST\"]".auth | base64 -d)
-  # If the above isnt null now then cut the registry contents
-  if [ "$REGISTRY_CONTENTS" != "null" ]; then 
+#If there is a secret present then this is a remote image with a secret to access
+if [ "$SECRET" != "" ]; then 
+  if [ "$TYPE" == "kubernetes.io/dockerconfigjson" ]; then
+    REGISTRY_CONTENTS=$(echo "$DOCKERCFG" | jq -r ". | .auths? | .[\"$REGISTRY_HOST\"]".auth | base64 -d)
     USERNAME=$(echo $REGISTRY_CONTENTS | cut -d ":" -f 1)
     PASSWORD=$(echo $REGISTRY_CONTENTS | cut -d ":" -f 2)
     USERNAME_PARAM="--username $USERNAME"
     PASSWORD_PARAM="--password $PASSWORD"
     podman login --tls-verify=false -u $USERNAME -p $PASSWORD $REGISTRY_HOST
+  elif [ "$TYPE" == "kubernetes.io/dockercfg" ]; then
+    REGISTRY_CONTENTS=$(echo "$DOCKERCFG" | jq -r ". | .[\"$REGISTRY_HOST\"]")
+    USERNAME=$(echo $REGISTRY_CONTENTS | jq -r .username) 
+    PASSWORD=$(echo $REGISTRY_CONTENTS | jq -r .password)
+    USERNAME_PARAM="--username $USERNAME"
+    PASSWORD_PARAM="--password $PASSWORD"
+    podman login --tls-verify=false -u $USERNAME -p $PASSWORD $REGISTRY_HOST
+  else           
+    echo "Error parsing pull secret"
+    exit 1
   fi
 fi
 
-if [ "$REGISTRY_CONTENTS" != "null" ]; then
+#This login is for local OCP when accessing imagestreams
+if [ "$SECRET" == "" ]; then
+  REGISTRY_CONTENTS=$(echo "$DOCKERCFG" | jq -r ". | .[\"$REGISTRY_HOST\"]")
   USERNAME=$(echo $REGISTRY_CONTENTS | jq -r .username) 
   PASSWORD=$(echo $REGISTRY_CONTENTS | jq -r .password)
   USERNAME_PARAM="--username $USERNAME"
