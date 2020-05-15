@@ -5,6 +5,4 @@ metadata:
 spec:
   containerImage:
     kind: ContainerRepository
-    name: quay.io/cnuland/hello-openshift:latest
-  pullSecret:
-    name: quay
+    name: quay.io/redhat-cop/image-scanning-signing-service:latest

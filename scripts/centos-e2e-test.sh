@@ -27,5 +27,5 @@ oc rollout status deploymentconfig dotnet-example --watch
 operator-sdk test local ./test/e2e/centos --namespace "image-management-test" --no-setup
 
 # Remove testing namespaces
-# oc delete project/signing-test
-# oc delete project/image-management-test
+ oc delete project/signing-test
+ oc delete project/image-management-test
