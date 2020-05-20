@@ -3,4 +3,6 @@ kind: ImageSigningRequest
 metadata:
   name: dotnet-app
 spec:
-  imageStreamTag: dotnet-example:latest
+  containerImage:
+    kind: ImageStreamTag
+    name: dotnet-example:latest

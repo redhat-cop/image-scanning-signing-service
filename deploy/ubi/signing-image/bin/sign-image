@@ -8,13 +8,16 @@ if [ "${IMAGE_SIGNATURE_EXISTS}" == "true" ]; then
   exit 0
 fi
 
-SA_FULLNAME=$(oc whoami)
-SA_NAME="${SA_FULLNAME##*:}"
-NAMESPACE=$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace)
-SA_JSON=$(oc get sa -n $NAMESPACE $SA_NAME -o json)
-DOCKERCFG_SECRET_NAME=$(echo "${SA_JSON}" | jq -r ".imagePullSecrets[] | select( .name | contains(\"${SA_NAME}-dockercfg\")).name")
-DOCKERCFG=$(oc get secret -n $NAMESPACE $DOCKERCFG_SECRET_NAME -o json | jq -r ".data[] | select(\".dockercfg\")" | base64 -d)
-
+if [ "$SECRET" == "" ]; then
+  SA_FULLNAME=$(oc whoami)
+  SA_NAME="${SA_FULLNAME##*:}"
+  NAMESPACE=$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace)
+  SA_JSON=$(oc get sa -n $NAMESPACE $SA_NAME -o json)
+  DOCKERCFG_SECRET_NAME=$(echo "${SA_JSON}" | jq -r ".imagePullSecrets[] | select( .name | contains(\"${SA_NAME}-dockercfg\")).name")
+  DOCKERCFG=$(oc get secret -n $NAMESPACE $DOCKERCFG_SECRET_NAME -o json | jq -r ".data[] | select(\".dockercfg\")" | base64 -d)
+else
+  DOCKERCFG=$(oc get secret -n $SECRET_NAMESPACE $SECRET -o json | jq -r ".data[] | select(\".dockercfg\")" | base64 -d)
+fi
 
 if [ -z ${IMAGE} ]; then
   echo "No Image Specified for Signing"
@@ -24,8 +27,22 @@ fi
 REGISTRY_HOST=${IMAGE%%/*}
 REGISTRY_CONTENTS=$(echo "$DOCKERCFG" | jq -r ". | .[\"$REGISTRY_HOST\"]")
 
+# If null then check if a registry token exists in the array of keys
+# Ignore if there is no secret for a remote registry
+if [ "$REGISTRY_CONTENTS" == "null" && "$SECRET" != ""]; then 
+  REGISTRY_CONTENTS=$(echo "$DOCKERCFG" | jq -r ". | .auths? | .[\"$REGISTRY_HOST\"]".auth | base64 -d)
+  # If the above isnt null now then cut the registry contents
+  if [ "$REGISTRY_CONTENTS" != "null" ]; then 
+    USERNAME=$(echo $REGISTRY_CONTENTS | cut -d ":" -f 1)
+    PASSWORD=$(echo $REGISTRY_CONTENTS | cut -d ":" -f 2)
+    USERNAME_PARAM="--username $USERNAME"
+    PASSWORD_PARAM="--password $PASSWORD"
+    podman login --tls-verify=false -u $USERNAME -p $PASSWORD $REGISTRY_HOST
+  fi
+fi
+
 if [ "$REGISTRY_CONTENTS" != "null" ]; then
-  USERNAME=$(echo $REGISTRY_CONTENTS | jq -r .username)
+  USERNAME=$(echo $REGISTRY_CONTENTS | jq -r .username) 
   PASSWORD=$(echo $REGISTRY_CONTENTS | jq -r .password)
   USERNAME_PARAM="--username $USERNAME"
   PASSWORD_PARAM="--password $PASSWORD"

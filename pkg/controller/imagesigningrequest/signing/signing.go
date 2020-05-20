@@ -68,9 +68,9 @@ func updateImageSigningRequest(client client.Client, imageSigningRequest *v1alph
 	return err
 }
 
-func LaunchSigningPod(client client.Client, scheme *runtime.Scheme, config config.Config, instance *v1alpha1.ImageSigningRequest, image string, imageDigest string, ownerID string, ownerReference string, gpgSecretName string, gpgSignBy string) (string, error) {
+func LaunchSigningPod(client client.Client, scheme *runtime.Scheme, config config.Config, instance *v1alpha1.ImageSigningRequest, image string, imageDigest string, ownerID string, ownerReference string, gpgSecretName string, gpgSignBy string, pushSecret string) (string, error) {
 
-	pod, err := createSigningPod(scheme, instance, config.SignScanImage, config.TargetProject, image, imageDigest, ownerID, ownerReference, "imagemanager", gpgSecretName, gpgSignBy)
+	pod, err := createSigningPod(scheme, instance, config.SignScanImage, config.TargetProject, image, imageDigest, ownerID, ownerReference, "imagemanager", gpgSecretName, gpgSignBy, pushSecret)
 	if err != nil {
 		logrus.Errorf("Error Generating Pod: %v'", err)
 		return "", err
@@ -91,7 +91,7 @@ func LaunchSigningPod(client client.Client, scheme *runtime.Scheme, config confi
 	return key, nil
 }
 
-func createSigningPod(scheme *runtime.Scheme, instance *v1alpha1.ImageSigningRequest, signScanImage string, targetProject string, image string, imageDigest string, ownerID string, ownerReference string, serviceAccount string, gpgSecret string, signBy string) (*corev1.Pod, error) {
+func createSigningPod(scheme *runtime.Scheme, instance *v1alpha1.ImageSigningRequest, signScanImage string, targetProject string, image string, imageDigest string, ownerID string, ownerReference string, serviceAccount string, gpgSecret string, signBy string, pushSecret string) (*corev1.Pod, error) {
 	priv := true
 	pod := &corev1.Pod{
 		TypeMeta: metav1.TypeMeta{
@@ -130,6 +130,14 @@ func createSigningPod(scheme *runtime.Scheme, instance *v1alpha1.ImageSigningReq
 					{
 						Name:  "SIGNBY",
 						Value: signBy,
+					},
+					{
+						Name:  "SECRET",
+						Value: pushSecret,
+					},
+					{
+						Name:  "SECRET_NAMESPACE",
+						Value: instance.ObjectMeta.Namespace,
 					},
 				},
 				SecurityContext: &corev1.SecurityContext{

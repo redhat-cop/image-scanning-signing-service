@@ -1,0 +1,8 @@
+apiVersion: imagesigningrequests.cop.redhat.com/v1alpha1
+kind: ImageSigningRequest
+metadata:
+  name: remote-app
+spec:
+  containerImage:
+    kind: ContainerRepository
+    name: quay.io/redhat-cop/image-scanning-signing-service:latest
