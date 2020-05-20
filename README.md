@@ -54,15 +54,6 @@ containerImage:
   name: image-scanning-signing-service:latest
 ```
 
-### ImageStreamTag (OpenShift)
-Sepcify an OCP `ImageStream` along with the corresponding digest of the desired image to sign. These are of kind `ImageStreamImage` under the `containerImage` attribute.
-
-```
-containerImage:
-  kind: ImageStreamImage
-  name: image-scanning-signing-service@sha256:763683295a9cc2b0e03ae7a415fce417fca5388935ba74e2b5d9d4e9b6ca6178
-```
-
 ## Pull Secrets
 A pull secret can be included in the `ImageSigningRequest` for when needing to access a private repository to sign images.
 
