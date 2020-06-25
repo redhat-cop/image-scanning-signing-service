@@ -3,5 +3,7 @@ kind: ImageSigningRequest
 metadata:
   name: nginx-1
 spec:
-  imageStreamTag: nginx:latest
+  containerImage:
+    kind: ImageStreamTag
+    name: nginx:latest
 
