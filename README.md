@@ -46,7 +46,7 @@ containerImage:
 ```
 
 ### ImageStreamTag (OpenShift)
-Sepcify an OCP `ImageStream` along with the corresponding tag of the desired image to sign. These are of kind `ImageStreamTag` under the `containerImage` attribute.
+Specify an OCP `ImageStream` along with the corresponding tag of the desired image to sign. These are of kind `ImageStreamTag` under the `containerImage` attribute.
 
 ```
 containerImage:
